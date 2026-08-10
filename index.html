@@ -68,7 +68,7 @@
   <div id="best"></div>
 </div>
 <div id="title"><b>鸡你太美·跳一跳</b><span>练习时长两年半 · ikun 版</span></div>
-<div class="hint">按住蓄力，松开起跳 —— 跳准下一个方块</div>
+<div class="hint">👆 点击屏幕开始</div>
 <button id="soundBtn">🔊</button>
 <div id="overlay">
   <div class="panel">
@@ -97,7 +97,7 @@
     </div>
   </div>
 </div>
-<div id="startOverlay" class="show">
+<div id="startOverlay">
   <div class="panel start-panel">
     <div class="kun-emoji">🕺🏀</div>
     <h1>鸡你太美</h1>
@@ -223,7 +223,9 @@ soundBtn.addEventListener('click', function(){
 
 /* ---------------- 输入 ---------------- */
 let pointerDown = false;
+let overlayPopped = false;
 function startGame(){
+  overlayPopped = true;
   startOverlay.classList.remove('show');
   hintEl.classList.remove('hide');
   newGame();
@@ -232,7 +234,14 @@ function startGame(){
 function press(e){
   e.preventDefault();
   if(state === STATE.READY){
-    startGame(); // 兜底：万一遮罩没渲染，首次点击也能直接开玩
+    if(!overlayPopped){
+      // 第一次点击：蹦出开始界面
+      overlayPopped = true;
+      startOverlay.classList.add('show');
+    } else {
+      // 兜底：若遮罩没生效（样式异常），第二次点击直接开玩
+      startGame();
+    }
     return;
   }
   if(state === STATE.IDLE){
