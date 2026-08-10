@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>鸡你太美 · 跳一跳</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#eef4fb; font-family:"Microsoft YaHei","PingFang SC",sans-serif; user-select:none; -webkit-user-select:none; }
+  #c { display:block; width:100%; height:100%; touch-action:none; }
+  #hud { position:fixed; top:12px; left:14px; color:#455a75; pointer-events:none; z-index:5; }
+  #score { font-size:34px; font-weight:800; letter-spacing:1px; text-shadow:0 2px 6px rgba(255,255,255,.8); }
+  #best { font-size:13px; opacity:.75; margin-top:2px; }
+  #title { position:fixed; top:12px; right:14px; text-align:right; pointer-events:none; z-index:5; color:#8a97ad; }
+  #title b { font-size:17px; color:#e0688a; letter-spacing:2px; }
+  #title span { font-size:11px; display:block; opacity:.7; }
+  #soundBtn { position:fixed; bottom:14px; right:14px; z-index:6; width:46px; height:46px; border-radius:50%;
+    border:none; background:rgba(255,255,255,.85); box-shadow:0 2px 10px rgba(0,0,0,.12); font-size:20px; cursor:pointer; color:#555; }
+  #overlay { position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center;
+    background:rgba(20,30,45,.55); z-index:10; backdrop-filter:blur(3px); }
+  #overlay.show { display:flex; }
+  .panel { background:#fff; border-radius:18px; padding:28px 42px; text-align:center; box-shadow:0 12px 40px rgba(0,0,0,.25); }
+  .panel h2 { font-size:26px; color:#e0688a; margin-bottom:6px; letter-spacing:4px; }
+  .panel .sub { font-size:13px; color:#999; margin-bottom:16px; }
+  .panel .fs { font-size:40px; font-weight:800; color:#455a75; }
+  .panel .fs small { font-size:14px; color:#aaa; font-weight:400; }
+  .btn { margin-top:20px; padding:12px 34px; border:none; border-radius:30px; background:linear-gradient(135deg,#ff9a76,#e0688a);
+    color:#fff; font-size:17px; font-weight:700; letter-spacing:3px; cursor:pointer; box-shadow:0 4px 14px rgba(224,104,138,.4); }
+  .btn:active { transform:scale(.96); }
+  .btn.ghost { background:#fff; color:#5fa8e0; border:2px solid #5fa8e0; box-shadow:none; margin-top:10px; }
+  .hint { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); color:#8a97ad; font-size:13px; z-index:5; pointer-events:none;
+    background:rgba(255,255,255,.7); padding:6px 14px; border-radius:20px; opacity:.9; transition:opacity .4s; }
+  .hint.hide { opacity:0; }
+  .start-panel h1 { font-size:42px; letter-spacing:6px; color:#e0688a; margin-bottom:2px; text-shadow:0 2px 0 #fff, 0 4px 12px rgba(224,104,138,.35); }
+  .kun-emoji { font-size:52px; margin-bottom:6px; }
+  .credit { margin-top:14px; font-size:11px; color:#bbb; }
+  #jumps { font-size:13px; opacity:.7; margin-top:2px; }
+  #shareUrl { margin-top:10px; font-size:12px; color:#888; word-break:break-all; line-height:1.5; }
+  .toast { position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:rgba(30,40,55,.85); color:#fff; padding:9px 20px; border-radius:22px; font-size:14px; opacity:0; transition:opacity .3s; pointer-events:none; z-index:20; white-space:nowrap; }
+  .toast.show { opacity:1; }
+  @media (max-width:600px){ #score{font-size:28px;} #title b{font-size:14px;} .start-panel h1{font-size:34px;} }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div id="score">0</div>
+  <div id="jumps">0 跳</div>
+  <div id="best"></div>
+</div>
+<div id="title"><b>鸡你太美·跳一跳</b><span>练习时长两年半 · ikun 版</span></div>
+<div class="hint">按住蓄力，松开起跳 —— 跳准下一个方块</div>
+<button id="soundBtn">🔊</button>
+<div id="overlay">
+  <div class="panel">
+    <h2>跳空了！</h2>
+    <div class="sub">你干嘛～ 哈哈哎哟</div>
+    <div class="fs"><span id="finScore">0</span> <small>分</small></div>
+    <div style="margin-top:8px;font-size:13px;color:#aaa;">共 <span id="finJumps">0</span> 跳 · 最高 <span id="finBest">0</span> 分</div>
+    <button class="btn" id="restartBtn">再来一局</button>
+    <button class="btn ghost" id="shareBtn">分享给朋友</button>
+    <div id="shareUrl"></div>
+  </div>
+</div>
+<div id="startOverlay" class="show">
+  <div class="panel start-panel">
+    <div class="kun-emoji">🕺🏀</div>
+    <h1>鸡你太美</h1>
+    <div class="sub">练习时长两年半的跳一跳</div>
+    <div style="font-size:13px;color:#888;">🎧 记得开声音哦</div>
+    <button class="btn" id="startBtn">开始游戏</button>
+    <div class="credit">按住蓄力 · 松开起跳 · 由 lxo 制作</div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<audio id="sJump" src="jntm.wav" preload="auto"></audio>
+<audio id="sFail" src="niganma.mp3" preload="auto"></audio>
+<audio id="sBgm" src="bgm.mp3" preload="auto" loop></audio>
+
+<script>
+(function(){
+"use strict";
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const jumpsEl = document.getElementById('jumps');
+const bestEl = document.getElementById('best');
+const overlay = document.getElementById('overlay');
+const startOverlay = document.getElementById('startOverlay');
+const finScore = document.getElementById('finScore');
+const finJumps = document.getElementById('finJumps');
+const finBest = document.getElementById('finBest');
+const shareUrl = document.getElementById('shareUrl');
+const toast = document.getElementById('toast');
+const hintEl = document.querySelector('.hint');
+const sJump = document.getElementById('sJump');
+const sFail = document.getElementById('sFail');
+const sBgm = document.getElementById('sBgm');
+const soundBtn = document.getElementById('soundBtn');
+
+// 公网分享地址（部署后生效）
+const SHARE_URL = 'https://cdn.jsdelivr.net/gh/lxoai/cxk-jump@main/';
+
+let W = 0, H = 0, DPR = 1;
+let groundY = 0, topY = 0;
+let best = +(localStorage.getItem('cxk_jump_best') || 0);
+bestEl.textContent = '最高 ' + best;
+
+function resize(){
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * DPR; canvas.height = H * DPR;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  groundY = H * 0.80;
+  topY = groundY - 130;
+}
+window.addEventListener('resize', resize);
+
+/* ---------------- 游戏状态 ---------------- */
+const G = 2600;          // 重力 px/s^2
+const VY0 = 1080;        // 起跳初速度
+const CHARGE_TIME = 0.9; // 蓄力满所需秒数
+const MAX_VX = 280;      // 最大水平速度
+const P_W = 44, P_H = 58;// 角色尺寸
+
+const STATE = { READY:0, IDLE:1, CHARGE:2, FLY:3, DEAD:4 };
+let state = STATE.READY;
+let score = 0, jumps = 0, charge = 0, holdT = 0, deadT = 0;
+let camX = 0;
+let popups = [];
+
+const player = { x:0, y:0, vx:0, vy:0, rot:0, sx:1, sy:1, targetBox:null, landed:false };
+
+const boxes = [];
+const COLORS = [
+  ['#f9a8c4','#f472a0'], ['#a7d8f9','#5fa8e0'], ['#b8e6b0','#7bc97f'],
+  ['#f9e08a','#f0b83a'], ['#d4b8f0','#a87de0'], ['#f7b57a','#ef8f3f'],
+  ['#9ee8dd','#4fc4b4'], ['#f2a2a2','#e06a6a']
+];
+
+const MEMES = ['鸡你太美','你干嘛～','小黑子','唱跳Rap篮球','坤坤加油','铁山靠','只因你太美','篮球梦'];
+const MILESTONE = ['鸡你太美！','太美了！','坤坤附体','封神了','无敌了'];
+
+function rand(a,b){ return a + Math.random()*(b-a); }
+function pick(arr){ return arr[(Math.random()*arr.length)|0]; }
+
+function makeBox(x, w){
+  const c = pick(COLORS);
+  return { x:x, w:w, top:c[0], front:c[1], used:false };
+}
+
+function spawnNext(){
+  const last = boxes[boxes.length-1];
+  const w = rand(88, 140);
+  const gap = rand(40, 150);
+  const x = last.x + last.w + gap;
+  boxes.push(makeBox(x, w));
+}
+
+function newGame(){
+  boxes.length = 0; popups.length = 0;
+  const b0 = makeBox(0, rand(110,140));
+  boxes.push(b0);
+  spawnNext(); spawnNext(); spawnNext();
+  camX = 0; score = 0; jumps = 0; charge = 0; holdT = 0; deadT = 0;
+  player.x = b0.x + b0.w/2;
+  player.y = topY;
+  player.vx = 0; player.vy = 0; player.rot = 0; player.sx = 1; player.sy = 1;
+  player.targetBox = boxes[1];
+  state = STATE.IDLE;
+  scoreEl.textContent = '0';
+  jumpsEl.textContent = '0 跳';
+}
+
+/* ---------------- 音频 ---------------- */
+let bgmOn = true;
+function playJump(){ try{ sJump.currentTime = 0; sJump.play(); }catch(e){} }
+function playFail(){ try{ sFail.currentTime = 0; sFail.play(); }catch(e){} }
+function playBgm(){ try{ if(bgmOn && sBgm.paused){ sBgm.volume = 0.5; sBgm.play(); } }catch(e){} }
+soundBtn.addEventListener('click', function(){
+  bgmOn = !bgmOn;
+  soundBtn.textContent = bgmOn ? '🔊' : '🔇';
+  if(bgmOn){ playBgm(); } else { sBgm.pause(); }
+});
+
+/* ---------------- 输入 ---------------- */
+let pointerDown = false;
+function press(e){
+  e.preventDefault();
+  if(state === STATE.IDLE){
+    state = STATE.CHARGE; holdT = 0; charge = 0;
+  }
+  playBgm(); // 首次交互后开 BGM
+}
+function release(e){
+  e.preventDefault();
+  if(state !== STATE.CHARGE) return;
+  const c = Math.min(charge, 1);
+  state = STATE.FLY;
+  player.vx = c * MAX_VX;
+  player.vy = -VY0;
+  player.landed = false;
+  jumps++;
+  jumpsEl.textContent = jumps + ' 跳';
+  playJump();
+}
+canvas.addEventListener('pointerdown', press);
+canvas.addEventListener('pointerup', release);
+canvas.addEventListener('pointercancel', release);
+window.addEventListener('keydown', function(e){
+  if(e.code === 'Space' && !e.repeat){ e.preventDefault(); if(state===STATE.IDLE){ state=STATE.CHARGE; holdT=0; charge=0; } }
+});
+window.addEventListener('keyup', function(e){
+  if(e.code === 'Space'){ e.preventDefault(); release(e); }
+});
+document.getElementById('restartBtn').addEventListener('click', function(){
+  overlay.classList.remove('show');
+  newGame();
+  playBgm();
+});
+document.getElementById('startBtn').addEventListener('click', function(){
+  startOverlay.classList.remove('show');
+  hintEl.classList.remove('hide');
+  newGame();
+  playBgm();
+});
+document.getElementById('shareBtn').addEventListener('click', function(){
+  const url = SHARE_URL;
+  shareUrl.textContent = url;
+  function ok(){
+    showToast('链接已复制，去分享吧 🎉');
+  }
+  function fail(){
+    shareUrl.style.display = 'block';
+    showToast('长按上方链接复制');
+  }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(ok, fail);
+  } else { fail(); }
+});
+let toastT = null;
+function showToast(msg){
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(function(){ toast.classList.remove('show'); }, 1800);
+}
+
+/* ---------------- 更新 ---------------- */
+let last = 0;
+function update(dt){
+  dt = Math.min(dt, 0.025);
+
+  if(state === STATE.CHARGE){
+    holdT += dt;
+    charge = holdT / CHARGE_TIME;
+    const c = Math.min(charge, 1);
+    player.sx = 1 + 0.38*c;
+    player.sy = 1 - 0.30*c;
+  }
+
+  if(state === STATE.FLY){
+    player.vy += G * dt;
+    player.x += player.vx * dt;
+    player.y += player.vy * dt;
+    player.rot = Math.min(player.vx * 0.0011, 0.32);
+
+    // 落地检测：脚(下边缘)越过方块顶面
+    const tgt = player.targetBox;
+    if(player.y >= topY && !player.landed){
+      player.landed = true;
+      const cur = boxes[0];
+      const distToCurCenter = player.x - (cur.x + cur.w/2);
+      if(distToCurCenter < cur.w/2 + 14){
+        landOn(cur, false);                 // 明显太短，落回原方块
+      } else if(player.x > tgt.x - 10 && player.x < tgt.x + tgt.w + 10){
+        landOn(tgt, true);                  // 精准落地
+      } else {
+        die();                              // 跳过头/落在夹缝
+      }
+    }
+  }
+
+  if(state === STATE.DEAD){
+    deadT += dt;
+    player.vy += G * dt;
+    player.y += player.vy * dt;
+    player.rot += 3.5 * dt;
+    if(deadT > 1.1){
+      finScore.textContent = score;
+      finJumps.textContent = jumps;
+      finBest.textContent = Math.max(best, score);
+      overlay.classList.add('show');
+    }
+  }
+
+  // 相机跟随
+  const targetCam = Math.max(0, player.x - W*0.42);
+  camX += (targetCam - camX) * Math.min(1, dt*8);
+
+  // 飘字
+  for(let i = popups.length-1; i >= 0; i--){
+    const p = popups[i];
+    p.t += dt; p.y -= 38*dt;
+    if(p.t > 1.1) popups.splice(i,1);
+  }
+}
+
+function landOn(box, scored){
+  player.x = box.x + box.w/2;
+  player.y = topY;        // 脚踩顶面
+  player.vx = 0; player.vy = 0;
+  player.rot = 0;
+  player.sx = 1.25; player.sy = 0.75; // 落地压扁动画
+  state = STATE.IDLE;
+  if(scored){
+    score++;
+    scoreEl.textContent = score;
+    if(score > best){ best = score; localStorage.setItem('cxk_jump_best', best); bestEl.textContent = '最高 ' + best; }
+    popups.push({ x: player.x - camX, y: player.y - 60, text: pick(MEMES), t: 0, big: false });
+    if(score % 10 === 0){
+      popups.push({ x: W/2, y: H*0.3, text: pick(MILESTONE), t: 0, big: true });
+    }
+    // 回收旧方块（当前所在方块前的都丢掉），生成新方块
+    if(boxes.length > 5) boxes.shift();
+    const idx = boxes.indexOf(box);
+    player.targetBox = boxes[idx+1] || null;
+    while(boxes.length < 5) spawnNext();
+    if(!player.targetBox) player.targetBox = boxes[1];
+  } else {
+    popups.push({ x: player.x - camX, y: player.y - 50, text: '太短了…', t: 0, big: false });
+  }
+}
+
+function die(){
+  state = STATE.DEAD;
+  deadT = 0;
+  player.vx = 0;
+  playFail();
+}
+
+/* ---------------- 渲染 ---------------- */
+function drawSky(){
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#cfe6ff');
+  g.addColorStop(0.7, '#eef4fb');
+  g.addColorStop(1, '#fdf3e7');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  // 云（视差）
+  ctx.fillStyle = 'rgba(255,255,255,.55)';
+  for(let i = 0; i < 5; i++){
+    const bx = ((i * 397 + 120 - camX * 0.25) % (W + 260) + W + 260) % (W + 260) - 130;
+    const by = 40 + i * 52;
+    const bw = 90 + (i % 3) * 46;
+    ctx.beginPath();
+    ctx.ellipse(bx, by, bw, 22, 0, 0, Math.PI*2);
+    ctx.ellipse(bx + bw*0.4, by - 14, bw*0.55, 18, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+}
+
+function drawGround(){
+  const g = ctx.createLinearGradient(0, groundY, 0, H);
+  g.addColorStop(0, '#f2e3cc');
+  g.addColorStop(1, '#e6d2b5');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, groundY, W, H - groundY);
+  ctx.fillStyle = 'rgba(255,255,255,.5)';
+  ctx.fillRect(0, groundY, W, 2);
+}
+
+function drawBox(b){
+  const x = b.x - camX, w = b.w;
+  if(x + w < -20 || x > W + 20) return;
+  // 侧面（前脸，带轻微透视暗部）
+  const g = ctx.createLinearGradient(0, topY, 0, groundY);
+  g.addColorStop(0, b.front);
+  g.addColorStop(1, shade(b.front, -0.22));
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(x + w*0.06, topY);
+  ctx.lineTo(x + w*0.94, topY);
+  ctx.lineTo(x + w, groundY);
+  ctx.lineTo(x, groundY);
+  ctx.closePath();
+  ctx.fill();
+  // 顶面
+  ctx.fillStyle = b.top;
+  roundRect(x, topY, w, 26, 9);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.55)';
+  roundRect(x + 5, topY + 4, w - 10, 8, 5);
+  ctx.fill();
+}
+
+function shade(hex, amt){
+  const n = parseInt(hex.slice(1), 16);
+  let r = (n>>16)&255, g = (n>>8)&255, b = n&255;
+  r = Math.max(0, Math.min(255, r + amt*255));
+  g = Math.max(0, Math.min(255, g + amt*255));
+  b = Math.max(0, Math.min(255, b + amt*255));
+  return 'rgb(' + (r|0) + ',' + (g|0) + ',' + (b|0) + ')';
+}
+
+function roundRect(x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function drawPlayer(){
+  const px = player.x - camX;
+  const py = player.y - P_H * player.sy * 0.5; // 中心点用于旋转
+  ctx.save();
+  ctx.translate(px, py);
+  ctx.rotate(player.rot);
+  ctx.scale(player.sx, player.sy);
+
+  // 影子
+  ctx.save();
+  ctx.globalAlpha = 0.22;
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.ellipse(0, P_H*0.5, P_W*0.34, 6, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+
+  const img = document.getElementById('sprite');
+  if(img && img.complete && img.naturalWidth > 0){
+    ctx.drawImage(img, -P_W/2, -P_H/2, P_W, P_H);
+  } else {
+    // 兜底：画个坤坤色小人
+    ctx.fillStyle = '#e0688a';
+    ctx.beginPath();
+    ctx.arc(0, -4, 12, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillRect(-8, 8, 16, 20);
+  }
+  ctx.restore();
+}
+
+function drawPopups(){
+  for(const p of popups){
+    const a = Math.max(0, 1 - p.t/1.1);
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.translate(p.x, p.y);
+    ctx.rotate((p.t * 0.4) - 0.15);
+    ctx.font = (p.big ? 'bold 34px' : 'bold 18px') + ' "Microsoft YaHei","PingFang SC",sans-serif';
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = 'rgba(255,255,255,.9)';
+    ctx.strokeText(p.text, 0, 0);
+    ctx.fillStyle = p.big ? '#e0688a' : '#5fa8e0';
+    ctx.fillText(p.text, 0, 0);
+    ctx.restore();
+  }
+}
+
+function drawChargeBar(){
+  if(state !== STATE.CHARGE) return;
+  const c = Math.min(charge, 1);
+  const px = player.x - camX;
+  const bw = 46;
+  ctx.fillStyle = 'rgba(0,0,0,.18)';
+  roundRect(px - bw/2, player.y - P_H - 26, bw, 8, 4);
+  ctx.fill();
+  ctx.fillStyle = c >= 1 ? '#ff5a5a' : '#ffb64d';
+  roundRect(px - bw/2, player.y - P_H - 26, bw * c, 8, 4);
+  ctx.fill();
+}
+
+function render(){
+  drawSky();
+  drawGround();
+  for(const b of boxes) drawBox(b);
+  drawPlayer();
+  drawPopups();
+  drawChargeBar();
+}
+
+/* ---------------- 主循环 ---------------- */
+function loop(ts){
+  const dt = (ts - last) / 1000;
+  last = ts;
+  update(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+
+const img = new Image();
+img.id = 'sprite';
+img.src = 'cxk.png';
+
+resize();
+newGame();
+state = STATE.READY; // 等待开始
+requestAnimationFrame(function(ts){ last = ts; requestAnimationFrame(loop); });
+})();
+</script>
+</body>
+</html>
