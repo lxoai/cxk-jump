@@ -110,7 +110,7 @@
 </div>
 <div class="toast" id="toast"></div>
 
-<audio id="sJump" src="jntm.wav" preload="auto"></audio>
+<audio id="sJump" src="jntm_song.mp3" preload="auto"></audio>
 <audio id="sFail" src="niganma.mp3" preload="auto"></audio>
 <audio id="sBgm" src="bgm.mp3" preload="auto" loop></audio>
 
@@ -158,7 +158,7 @@ window.addEventListener('resize', resize);
 const G = 2600;          // 重力 px/s^2
 const VY0 = 1080;        // 起跳初速度
 const CHARGE_TIME = 0.9; // 蓄力满所需秒数
-const MAX_VX = 280;      // 最大水平速度
+const MAX_VX = 305;      // 最大水平速度
 const P_W = 44, P_H = 58;// 角色尺寸
 
 const STATE = { READY:0, IDLE:1, CHARGE:2, FLY:3, DEAD:4 };
@@ -189,8 +189,10 @@ function makeBox(x, w){
 
 function spawnNext(){
   const last = boxes[boxes.length-1];
-  const w = rand(88, 140);
-  const gap = rand(40, 150);
+  // 难度曲线：分数越高，方块越窄、间距越大
+  const diff = Math.min(score, 40);
+  const w = rand(88 - diff*0.7, 140 - diff*0.7);
+  const gap = rand(40 + diff*1.8, Math.min(150 + diff*2.2, 190));
   const x = last.x + last.w + gap;
   boxes.push(makeBox(x, w));
 }

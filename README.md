@@ -17,6 +17,6 @@
 ## 素材来源
 - 角色素材：wanganjin/CXK-play-basketball-game
 - BGM / 失败音效：dreamhunter2333/ikun-whacamole
-- 跳跃音效：系统 TTS 合成「鸡你太美」
+- 跳跃音效：从「鸡你太美」原曲截取的唱段（帧级精准切割）
 
 Made with ❤️ by lxo
