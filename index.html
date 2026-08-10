@@ -19,7 +19,7 @@
   #overlay { position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center;
     background:rgba(20,30,45,.55); z-index:10; backdrop-filter:blur(3px); }
   #overlay.show { display:flex; }
-  #startOverlay { position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; background:rgba(20,30,45,.55); z-index:10; backdrop-filter:blur(3px); }
+  #startOverlay { position:fixed; top:0; left:0; right:0; bottom:0; display:none; flex-direction:column; align-items:center; justify-content:center; background:rgba(20,30,45,.55); z-index:10; -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px); }
   #startOverlay.show { display:flex; }
   .panel { background:#fff; border-radius:18px; padding:28px 42px; text-align:center; box-shadow:0 12px 40px rgba(0,0,0,.25); }
   .panel h2 { font-size:26px; color:#e0688a; margin-bottom:6px; letter-spacing:4px; }
@@ -223,8 +223,18 @@ soundBtn.addEventListener('click', function(){
 
 /* ---------------- 输入 ---------------- */
 let pointerDown = false;
+function startGame(){
+  startOverlay.classList.remove('show');
+  hintEl.classList.remove('hide');
+  newGame();
+  playBgm();
+}
 function press(e){
   e.preventDefault();
+  if(state === STATE.READY){
+    startGame(); // 兜底：万一遮罩没渲染，首次点击也能直接开玩
+    return;
+  }
   if(state === STATE.IDLE){
     state = STATE.CHARGE; holdT = 0; charge = 0;
   }
@@ -256,11 +266,10 @@ document.getElementById('restartBtn').addEventListener('click', function(){
   newGame();
   playBgm();
 });
-document.getElementById('startBtn').addEventListener('click', function(){
-  startOverlay.classList.remove('show');
-  hintEl.classList.remove('hide');
-  newGame();
-  playBgm();
+document.getElementById('startBtn').addEventListener('click', startGame);
+// 点遮罩任意位置也直接开始（按钮失效时的兜底）
+startOverlay.addEventListener('pointerdown', function(e){
+  if(e.target === startOverlay || e.target.classList.contains('panel')) startGame();
 });
 document.getElementById('shareBtn').addEventListener('click', function(){
   const url = SHARE_URL;
