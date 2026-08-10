@@ -133,8 +133,8 @@ const sFail = document.getElementById('sFail');
 const sBgm = document.getElementById('sBgm');
 const soundBtn = document.getElementById('soundBtn');
 
-// 公网分享地址（部署后生效）
-const SHARE_URL = 'https://cdn.jsdelivr.net/gh/lxoai/cxk-jump@main/';
+// 公网分享地址
+const SHARE_URL = 'https://lxoai.github.io/cxk-jump/';
 
 let W = 0, H = 0, DPR = 1;
 let groundY = 0, topY = 0;
@@ -283,7 +283,7 @@ function showToast(msg){
 }
 
 /* ---------------- 排行榜 ---------------- */
-const LB_PTR = 'https://cdn.jsdelivr.net/gh/lxoai/cxk-jump@main/lb.json';
+const LB_PTR = 'https://api.github.com/repos/lxoai/cxk-jump/contents/lb.json';
 const LB_API = 'https://jsonblob.com/api/jsonBlob/';
 let lbId = null;
 let myName = localStorage.getItem('cxk_name') || ('ikun' + (100 + ((Math.random()*900)|0)));
@@ -297,8 +297,9 @@ async function getLbId(){
   }
   const r = await fetch(LB_PTR, { cache: 'no-store' });
   const j = await r.json();
-  localStorage.setItem('cxk_lb', JSON.stringify({ id: j.id, t: Date.now() }));
-  return j.id;
+  const id = JSON.parse(atob(j.content)).id;
+  localStorage.setItem('cxk_lb', JSON.stringify({ id: id, t: Date.now() }));
+  return id;
 }
 
 async function lbRead(){
