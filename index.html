@@ -167,7 +167,7 @@ let score = 0, jumps = 0, charge = 0, holdT = 0, deadT = 0;
 let camX = 0;
 let popups = [];
 
-const player = { x:0, y:0, vx:0, vy:0, rot:0, sx:1, sy:1, targetBox:null, landed:false };
+const player = { x:0, y:0, vx:0, vy:0, rot:0, sx:1, sy:1, targetBox:null, landed:false, settling:false, settleT:0, landX:0 };
 
 const boxes = [];
 const COLORS = [
@@ -204,6 +204,7 @@ function newGame(){
   player.x = b0.x + b0.w/2;
   player.y = topY;
   player.vx = 0; player.vy = 0; player.rot = 0; player.sx = 1; player.sy = 1;
+  player.settling = false;
   player.targetBox = boxes[1];
   state = STATE.IDLE;
   scoreEl.textContent = '0';
@@ -245,6 +246,12 @@ function press(e){
     return;
   }
   if(state === STATE.IDLE){
+    if(player.settling){
+      // 立即结束归位缓冲
+      player.settling = false;
+      player.x = player.landX;
+      player.sx = 1; player.sy = 1;
+    }
     state = STATE.CHARGE; holdT = 0; charge = 0;
   }
   playBgm(); // 首次交互后开 BGM
@@ -409,6 +416,19 @@ let last = 0;
 function update(dt){
   dt = Math.min(dt, 0.025);
 
+  // 落地归位缓冲（平滑滑到方块中心 + 压扁回弹）
+  if(player.settling){
+    player.settleT += dt;
+    player.x += (player.landX - player.x) * Math.min(1, dt * 14);
+    player.sx += (1 - player.sx) * Math.min(1, dt * 10);
+    player.sy += (1 - player.sy) * Math.min(1, dt * 10);
+    if(player.settleT > 0.25){
+      player.settling = false;
+      player.x = player.landX;
+      player.sx = 1; player.sy = 1;
+    }
+  }
+
   if(state === STATE.CHARGE){
     holdT += dt;
     charge = holdT / CHARGE_TIME;
@@ -466,8 +486,10 @@ function update(dt){
 }
 
 function landOn(box, scored){
-  player.x = box.x + box.w/2;
   player.y = topY;        // 脚踩顶面
+  player.landX = box.x + box.w/2; // 归位目标（平滑缓冲过去）
+  player.settling = true;
+  player.settleT = 0;
   player.vx = 0; player.vy = 0;
   player.rot = 0;
   player.sx = 1.25; player.sy = 0.75; // 落地压扁动画
@@ -480,10 +502,9 @@ function landOn(box, scored){
     if(score % 10 === 0){
       popups.push({ x: W/2, y: H*0.3, text: pick(MILESTONE), t: 0, big: true });
     }
-    // 回收旧方块（当前所在方块前的都丢掉），生成新方块
-    if(boxes.length > 5) boxes.shift();
-    const idx = boxes.indexOf(box);
-    player.targetBox = boxes[idx+1] || null;
+    // 方块队列：把当前方块之前的全部丢掉，当前方块成为队列头，目标永远=下一个
+    while(boxes.length > 1 && boxes[0] !== box) boxes.shift();
+    player.targetBox = boxes[1] || null;
     while(boxes.length < 5) spawnNext();
     if(!player.targetBox) player.targetBox = boxes[1];
   } else {
