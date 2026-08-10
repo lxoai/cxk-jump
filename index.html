@@ -19,6 +19,8 @@
   #overlay { position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center;
     background:rgba(20,30,45,.55); z-index:10; backdrop-filter:blur(3px); }
   #overlay.show { display:flex; }
+  #startOverlay { position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; background:rgba(20,30,45,.55); z-index:10; backdrop-filter:blur(3px); }
+  #startOverlay.show { display:flex; }
   .panel { background:#fff; border-radius:18px; padding:28px 42px; text-align:center; box-shadow:0 12px 40px rgba(0,0,0,.25); }
   .panel h2 { font-size:26px; color:#e0688a; margin-bottom:6px; letter-spacing:4px; }
   .panel .sub { font-size:13px; color:#999; margin-bottom:16px; }
@@ -569,9 +571,8 @@ function drawPlayer(){
   ctx.fill();
   ctx.restore();
 
-  const img = document.getElementById('sprite');
-  if(img && img.complete && img.naturalWidth > 0){
-    ctx.drawImage(img, -P_W/2, -P_H/2, P_W, P_H);
+  if(spriteImg.complete && spriteImg.naturalWidth > 0){
+    ctx.drawImage(spriteImg, -P_W/2, -P_H/2, P_W, P_H);
   } else {
     // 兜底：画个坤坤色小人
     ctx.fillStyle = '#e0688a';
@@ -632,9 +633,8 @@ function loop(ts){
   requestAnimationFrame(loop);
 }
 
-const img = new Image();
-img.id = 'sprite';
-img.src = 'cxk.png';
+const spriteImg = new Image();
+spriteImg.src = 'cxk.png';
 
 resize();
 newGame();
