@@ -38,6 +38,23 @@
   #shareUrl { margin-top:10px; font-size:12px; color:#888; word-break:break-all; line-height:1.5; }
   .toast { position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:rgba(30,40,55,.85); color:#fff; padding:9px 20px; border-radius:22px; font-size:14px; opacity:0; transition:opacity .3s; pointer-events:none; z-index:20; white-space:nowrap; }
   .toast.show { opacity:1; }
+  #lbOverlay { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(20,30,45,.55); z-index:10; backdrop-filter:blur(3px); }
+  #lbOverlay.show { display:flex; }
+  .lb-panel { max-width:90vw; width:350px; padding:22px 24px; }
+  .lb-panel h2 { font-size:22px; color:#e0688a; letter-spacing:2px; }
+  #lbList { max-height:52vh; overflow-y:auto; text-align:left; margin-top:6px; }
+  .lb-item { display:flex; align-items:center; gap:10px; padding:7px 10px; border-radius:10px; font-size:14px; }
+  .lb-item:nth-child(odd) { background:#f6f8fb; }
+  .lb-item.me { background:#ffe8ef; outline:1px solid #f4a8c0; }
+  .lb-rank { width:36px; text-align:center; font-weight:800; color:#455a75; flex-shrink:0; }
+  .lb-rank.g1 { color:#f0a020; } .lb-rank.g2 { color:#8a93a8; } .lb-rank.g3 { color:#c98a4a; }
+  .lb-name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#455a75; }
+  .lb-score { font-weight:800; color:#e0688a; }
+  .lb-jumps { font-size:11px; color:#aaa; width:58px; text-align:right; }
+  .lb-empty { text-align:center; color:#aaa; padding:24px 0; font-size:14px; }
+  #submitRow input { width:150px; padding:9px 12px; border:2px solid #e5e9f0; border-radius:20px; font-size:14px; outline:none; margin-right:8px; }
+  #submitRow input:focus { border-color:#5fa8e0; }
+  .btn.mini { margin-top:0; padding:9px 18px; font-size:14px; }
   @media (max-width:600px){ #score{font-size:28px;} #title b{font-size:14px;} .start-panel h1{font-size:34px;} }
 </style>
 </head>
@@ -60,6 +77,22 @@
     <button class="btn" id="restartBtn">再来一局</button>
     <button class="btn ghost" id="shareBtn">分享给朋友</button>
     <div id="shareUrl"></div>
+    <div id="submitRow" style="margin-top:12px;display:none;">
+      <input id="nameInput" maxlength="12" placeholder="输入昵称" autocomplete="off">
+      <button class="btn mini" id="submitBtn">提交成绩</button>
+    </div>
+    <button class="btn ghost" id="viewLbBtn">🏆 排行榜</button>
+  </div>
+</div>
+<div id="lbOverlay">
+  <div class="panel lb-panel">
+    <h2>🏆 排行榜</h2>
+    <div class="sub" style="margin-bottom:4px;">全服 ikun 实时竞技</div>
+    <div id="lbList">加载中…</div>
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:14px;">
+      <button class="btn ghost" id="lbRefreshBtn">刷新</button>
+      <button class="btn" id="lbCloseBtn">关闭</button>
+    </div>
   </div>
 </div>
 <div id="startOverlay" class="show">
@@ -69,6 +102,7 @@
     <div class="sub">练习时长两年半的跳一跳</div>
     <div style="font-size:13px;color:#888;">🎧 记得开声音哦</div>
     <button class="btn" id="startBtn">开始游戏</button>
+    <button class="btn ghost" id="lbBtn">🏆 排行榜</button>
     <div class="credit">按住蓄力 · 松开起跳 · 由 lxo 制作</div>
   </div>
 </div>
@@ -248,6 +282,107 @@ function showToast(msg){
   toastT = setTimeout(function(){ toast.classList.remove('show'); }, 1800);
 }
 
+/* ---------------- 排行榜 ---------------- */
+const LB_PTR = 'https://cdn.jsdelivr.net/gh/lxoai/cxk-jump@main/lb.json';
+const LB_API = 'https://jsonblob.com/api/jsonBlob/';
+let lbId = null;
+let myName = localStorage.getItem('cxk_name') || ('ikun' + (100 + ((Math.random()*900)|0)));
+
+function esc(s){ return String(s).replace(/[<>&"]/g, function(c){ return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]; }); }
+
+async function getLbId(){
+  const cache = localStorage.getItem('cxk_lb');
+  if(cache){
+    try{ const c = JSON.parse(cache); if(Date.now() - c.t < 6*3600e3) return c.id; }catch(e){}
+  }
+  const r = await fetch(LB_PTR, { cache: 'no-store' });
+  const j = await r.json();
+  localStorage.setItem('cxk_lb', JSON.stringify({ id: j.id, t: Date.now() }));
+  return j.id;
+}
+
+async function lbRead(){
+  if(!lbId) lbId = await getLbId();
+  const r = await fetch(LB_API + lbId, { cache: 'no-store' });
+  const j = await r.json();
+  return Array.isArray(j.scores) ? j.scores : [];
+}
+
+async function lbSubmit(entry){
+  if(!lbId) lbId = await getLbId();
+  let scores = [];
+  try { scores = await lbRead(); } catch(e){}
+  scores.push(entry);
+  scores.sort(function(a,b){ return (b.score - a.score) || (b.jumps - a.jumps) || (b.ts - a.ts); });
+  if(scores.length > 300) scores = scores.slice(0, 300);
+  const r = await fetch(LB_API + lbId, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scores: scores })
+  });
+  if(!r.ok) throw new Error('write failed');
+}
+
+async function openLb(){
+  document.getElementById('lbOverlay').classList.add('show');
+  const list = document.getElementById('lbList');
+  list.textContent = '加载中…';
+  try{
+    const scores = await lbRead();
+    scores.sort(function(a,b){ return (b.score - a.score) || (b.jumps - a.jumps) || (b.ts - a.ts); });
+    const top = scores.slice(0, 20);
+    if(!top.length){
+      list.innerHTML = '<div class="lb-empty">还没有人上榜，快来抢第一！</div>';
+      return;
+    }
+    list.innerHTML = top.map(function(s, i){
+      const medal = i===0 ? '🥇' : (i===1 ? '🥈' : (i===2 ? '🥉' : (i+1)));
+      const me = (s.name === myName) ? ' me' : '';
+      return '<div class="lb-item' + me + '"><span class="lb-rank ' + (i<3 ? 'g'+(i+1) : '') + '">' + medal + '</span><span class="lb-name">' + esc(s.name) + '</span><span class="lb-score">' + s.score + ' 分</span><span class="lb-jumps">' + s.jumps + ' 跳</span></div>';
+    }).join('');
+  }catch(e){
+    list.innerHTML = '<div class="lb-empty">排行榜暂时连不上，稍后再试~</div>';
+  }
+}
+
+function showSubmitRow(){
+  const row = document.getElementById('submitRow');
+  const inp = document.getElementById('nameInput');
+  const btn = document.getElementById('submitBtn');
+  row.style.display = (score > 0) ? 'block' : 'none';
+  inp.value = myName;
+  btn.disabled = false;
+  btn.textContent = '提交成绩';
+}
+
+document.getElementById('lbBtn').addEventListener('click', openLb);
+document.getElementById('viewLbBtn').addEventListener('click', openLb);
+document.getElementById('lbCloseBtn').addEventListener('click', function(){ document.getElementById('lbOverlay').classList.remove('show'); });
+document.getElementById('lbRefreshBtn').addEventListener('click', openLb);
+document.getElementById('nameInput').addEventListener('keydown', function(e){
+  if(e.key === 'Enter') document.getElementById('submitBtn').click();
+});
+document.getElementById('submitBtn').addEventListener('click', async function(){
+  const btn = this;
+  if(btn.disabled) return;
+  const inp = document.getElementById('nameInput');
+  const name = (inp.value.trim() || myName).slice(0, 12);
+  myName = name;
+  localStorage.setItem('cxk_name', name);
+  btn.disabled = true;
+  btn.textContent = '提交中…';
+  try{
+    await lbSubmit({ name: myName, score: score, jumps: jumps, ts: Date.now() });
+    showToast('成绩已上榜 🎉');
+    document.getElementById('submitRow').style.display = 'none';
+    openLb();
+  }catch(e){
+    showToast('提交失败，网络开小差了');
+    btn.disabled = false;
+    btn.textContent = '提交成绩';
+  }
+});
+
 /* ---------------- 更新 ---------------- */
 let last = 0;
 function update(dt){
@@ -293,6 +428,7 @@ function update(dt){
       finJumps.textContent = jumps;
       finBest.textContent = Math.max(best, score);
       overlay.classList.add('show');
+      showSubmitRow();
     }
   }
 

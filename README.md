@@ -10,6 +10,10 @@
 - 跳空会听到「你干嘛～」并游戏结束
 - BGM 为真·鸡你太美神曲循环，右下角可静音
 
+## 🏆 排行榜
+- 全服实时排行榜，游戏结束后提交昵称即可上榜
+- 数据存储于 jsonblob.com（每 12 小时自动轮换迁移，分数长期保留）
+
 ## 素材来源
 - 角色素材：wanganjin/CXK-play-basketball-game
 - BGM / 失败音效：dreamhunter2333/ikun-whacamole
