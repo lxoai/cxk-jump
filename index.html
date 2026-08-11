@@ -17,6 +17,9 @@
   #modeTag { font-size:11px; color:#8a97ad; margin-top:2px; opacity:.8; }
   #timerEl { position:fixed; top:14px; left:50%; transform:translateX(-50%); font-size:34px; font-weight:800; color:#455a75;
     text-shadow:0 2px 8px rgba(255,255,255,.9); z-index:5; display:none; }
+  #redMoonTag { position:fixed; top:66px; left:50%; transform:translateX(-50%); color:#ff5050; font-size:15px; font-weight:800; letter-spacing:3px;
+    text-shadow:0 0 14px rgba(255,60,60,.9); z-index:5; display:none; pointer-events:none; animation:redpulse 1.1s infinite; }
+  @keyframes redpulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }
   #title { position:fixed; top:12px; right:14px; text-align:right; pointer-events:none; z-index:5; color:#8a97ad; }
   #title b { font-size:17px; color:#e0688a; letter-spacing:2px; }
   #title span { font-size:11px; display:block; opacity:.7; }
@@ -91,6 +94,7 @@
   <div id="modeTag"></div>
 </div>
 <div id="timerEl"></div>
+<div id="redMoonTag">🌕 红月降临</div>
 <div id="title"><b>鸡你太美·跳一跳</b><span>玩法大礼包 v2.0 · ikun 版</span></div>
 <div class="hint">👆 点击屏幕开始</div>
 <button id="soundBtn">🔊</button>
@@ -183,6 +187,7 @@ const cardImg = document.getElementById('cardImg');
 const shareUrl = document.getElementById('shareUrl');
 const toast = document.getElementById('toast');
 const hintEl = document.querySelector('.hint');
+const redMoonTag = document.getElementById('redMoonTag');
 const startCoinsEl = document.getElementById('startCoins');
 const sJump = document.getElementById('sJump');
 const sFail = document.getElementById('sFail');
@@ -227,6 +232,7 @@ let coinsAtStart = 0;
 let camX = 0, timeLeft = 0, diedBy = 'fall';
 let cardDataUrl = '';
 let popups = [], particles = [];
+let redMoon = false, fans = [], letters = [], fanT = 0, nextFanIn = 0, flashT = 0;
 
 const player = { x:0, y:0, vx:0, vy:0, rot:0, sx:1, sy:1, targetBox:null, landed:false, standingBox:null };
 
@@ -239,8 +245,8 @@ const COLORS = [
 
 const MEMES = ['鸡你太美','你干嘛～','小黑子','唱跳Rap篮球','坤坤加油','铁山靠','只因你太美','篮球梦'];
 const MILESTONE = ['鸡你太美！','太美了！','坤坤附体','封神了','无敌了'];
-const DIE_TITLES = { fall:'跳空了！', crack:'踩碎了！', slide:'被甩下去了！', time:'时间到！' };
-const DIE_SUBS = { fall:'你干嘛～ 哈哈哎哟', crack:'碎台子不是好惹的…', slide:'移动台子会甩人！', time:'60 秒结束，跳得不错嘛' };
+const DIE_TITLES = { fall:'跳空了！', crack:'踩碎了！', slide:'被甩下去了！', time:'时间到！', lawyer:'被律师函击中了！' };
+const DIE_SUBS = { fall:'你干嘛～ 哈哈哎哟', crack:'碎台子不是好惹的…', slide:'移动台子会甩人！', time:'60 秒结束，跳得不错嘛', lawyer:'真爱粉的怒火，收下吧！' };
 
 const MODES = {
   classic: { label:'🎮 经典模式' },
@@ -334,6 +340,9 @@ function spawnNext(){
 
 function newGame(){
   boxes.length = 0; popups.length = 0; particles.length = 0;
+  fans.length = 0; letters.length = 0;
+  redMoon = false; fanT = 0; nextFanIn = 0; flashT = 0;
+  redMoonTag.style.display = 'none';
   if(mode === 'daily') rng = mulberry32(hashStr('cxk-jump-' + dateStr()));
   else rng = Math.random;
   const b0 = makeBox(0, rnd(110, 140), 'normal', false);
@@ -721,6 +730,8 @@ function landOn(box, scored){
     }
     updateComboHud();
 
+    if(!redMoon && score >= 1000) enterRedMoon();
+
     if(box.type === 'coin'){
       addCoin(2);
       popup('💰 +2', '#ffb64d', false);
@@ -767,6 +778,32 @@ function die(reason){
   player.vx = 0;
   if(reason) diedBy = reason;
   playFail();
+}
+
+/* ---------------- 红月隐藏玩法 ---------------- */
+function enterRedMoon(){
+  redMoon = true;
+  redMoonTag.style.display = 'block';
+  popup('🌕 红月降临', '#ff5050', true, W/2, H*0.24);
+  popup('坤坤怒了！', '#ff2020', true, W/2, H*0.36);
+  flashT = 0.7;
+  playRedMoon();
+  fanT = 0; nextFanIn = 2.2;
+}
+function playRedMoon(){
+  tone(70, 0.5, 'sawtooth', 0.14);
+  tone(52, 0.7, 'sawtooth', 0.14, 0.1);
+  tone(980, 0.18, 'square', 0.06, 0.05);
+}
+function spawnFan(){
+  if(boxes.length < 2 || fans.length >= 2) return;
+  const b = boxes[(Math.random() * Math.min(boxes.length, 3)) | 0];
+  fans.push({
+    x: b.x + b.w/2 + (Math.random() * 36 - 18),
+    y: topY - 74 - Math.random() * 22,
+    t: 0,
+    launchT: 1.1 + Math.random() * 0.4
+  });
 }
 
 /* ---------------- 更新 ---------------- */
@@ -849,6 +886,44 @@ function update(dt){
       }
     }
   }
+
+  // 红月：真爱粉出现（只在玩家站立时生成，保证可反应）
+  if(redMoon && state === STATE.IDLE){
+    fanT += dt;
+    if(fanT >= nextFanIn){
+      fanT = 0;
+      nextFanIn = 3.4 + Math.random() * 2.0;
+      spawnFan();
+    }
+  }
+  for(let i = fans.length - 1; i >= 0; i--){
+    const f = fans[i];
+    f.t += dt;
+    if(f.t >= f.launchT){
+      letters.push({ x: f.x, y: f.y, vy: 80, rot: Math.random()*0.7 - 0.35, spin: Math.random()*4.4 - 2.2 });
+      fans.splice(i, 1);
+      tone(880, 0.05, 'square', 0.04);
+    }
+  }
+  for(let i = letters.length - 1; i >= 0; i--){
+    const l = letters[i];
+    l.vy += 520 * dt;
+    l.y += l.vy * dt;
+    l.rot += l.spin * dt;
+    if(l.y > topY + 90){ letters.splice(i, 1); continue; }
+    if(state !== STATE.DEAD && state !== STATE.READY){
+      const dx = Math.abs(l.x - player.x);
+      const dy = Math.abs(l.y - (player.y - 18));
+      if(dx < 24 && dy < 38){
+        burst(l.x - camX, l.y - 10, '#e02020', 26);
+        burst(l.x - camX, l.y - 10, '#fff', 10);
+        letters.splice(i, 1);
+        die('lawyer');
+        continue;
+      }
+    }
+  }
+  if(flashT > 0) flashT -= dt;
 
   // 限时模式倒计时
   if(mode === 'timed' && state !== STATE.READY && state !== STATE.DEAD){
@@ -942,6 +1017,11 @@ function makeCardDataUrl(){
   g.fillText('PERFECT × ' + perfects, 320, 502);
   g.fillText('最高连击 × ' + maxCombo, 320, 552);
   g.fillText('金币 +' + (coins - coinsAtStart), 320, 602);
+  if(redMoon){
+    g.fillStyle = '#ff5050';
+    g.font = 'bold 24px "Microsoft YaHei","PingFang SC",sans-serif';
+    g.fillText('🌕 红月觉醒', 320, 644);
+  }
   g.fillStyle = '#e0688a';
   g.font = 'bold 24px "Microsoft YaHei","PingFang SC",sans-serif';
   g.fillText(pick(MEMES) + '！', 320, 690);
@@ -953,32 +1033,156 @@ function makeCardDataUrl(){
 
 /* ---------------- 渲染 ---------------- */
 function drawSky(){
+  // 黑暗恐怖夜色
   const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, '#cfe6ff');
-  g.addColorStop(0.7, '#eef4fb');
-  g.addColorStop(1, '#fdf3e7');
+  g.addColorStop(0, '#0d0a1e');
+  g.addColorStop(0.55, '#1b1333');
+  g.addColorStop(0.85, '#2b1e3d');
+  g.addColorStop(1, '#382744');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = 'rgba(255,255,255,.55)';
-  for(let i = 0; i < 5; i++){
-    const bx = ((i * 397 + 120 - camX * 0.25) % (W + 260) + W + 260) % (W + 260) - 130;
-    const by = 40 + i * 52;
-    const bw = 90 + (i % 3) * 46;
-    ctx.beginPath();
-    ctx.ellipse(bx, by, bw, 22, 0, 0, Math.PI*2);
-    ctx.ellipse(bx + bw*0.4, by - 14, bw*0.55, 18, 0, 0, Math.PI*2);
-    ctx.fill();
+  // 星空（双绘制无缝循环，防背景断片）
+  const starSpan = W + 80;
+  for(let i = 0; i < 45; i++){
+    let sx = (((i * 173.7) % 1) * starSpan - camX * 0.08) % starSpan;
+    if(sx < 0) sx += starSpan;
+    const sy = (((i * 97.3) % 1) * 0.52) * H;
+    const tw = 0.3 + 0.35 * Math.sin(gameT * 1.7 + i * 0.61);
+    ctx.globalAlpha = tw;
+    ctx.fillStyle = (i % 3 === 0) ? '#cfd8ff' : '#8f96c8';
+    for(const ox of [0, -starSpan, starSpan]){
+      const x = sx + ox;
+      if(x < -10 || x > W + 10) continue;
+      ctx.beginPath();
+      ctx.arc(x, sy, 0.7 + (i % 3) * 0.45, 0, Math.PI*2);
+      ctx.fill();
+    }
   }
+  ctx.globalAlpha = 1;
+  // 暗云（双绘制无缝）
+  for(let i = 0; i < 6; i++){
+    const span = W + 320;
+    let sx = ((i * 431 + 140 - camX * (0.12 + i * 0.025)) % span + span) % span - 160;
+    const by = 26 + i * 56;
+    const bw = 110 + (i % 4) * 62;
+    ctx.fillStyle = 'rgba(26,18,48,.5)';
+    for(const ox of [0, -span, span]){
+      const x = sx + ox;
+      if(x + bw < -20 || x > W + 20) continue;
+      ctx.beginPath();
+      ctx.ellipse(x, by, bw, 20, 0, 0, Math.PI*2);
+      ctx.ellipse(x + bw*0.4, by - 12, bw*0.55, 16, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+  // 红月（坤坤愤怒的脸）
+  if(redMoon) drawRedMoon();
+  // 红月全局泛红 + 暗角
+  if(redMoon){
+    const rg = ctx.createLinearGradient(0, 0, 0, H);
+    rg.addColorStop(0, 'rgba(255,40,40,.22)');
+    rg.addColorStop(0.55, 'rgba(140,10,30,.08)');
+    rg.addColorStop(1, 'rgba(0,0,0,.30)');
+    ctx.fillStyle = rg;
+    ctx.fillRect(0, 0, W, H);
+  }
+}
+
+function drawRedMoon(){
+  const mx = W * 0.76 - camX * 0.02;
+  const my = H * 0.2;
+  const R = Math.max(46, Math.min(W, H) * 0.105);
+  // 呼吸光晕
+  const pu = 0.45 + 0.15 * Math.sin(gameT * 2.4);
+  const halo = ctx.createRadialGradient(mx, my, R*0.4, mx, my, R*2.4);
+  halo.addColorStop(0, 'rgba(255,60,50,' + pu.toFixed(2) + ')');
+  halo.addColorStop(1, 'rgba(255,60,50,0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath(); ctx.arc(mx, my, R*2.4, 0, Math.PI*2); ctx.fill();
+  // 月亮本体
+  const mg = ctx.createRadialGradient(mx - R*0.3, my - R*0.3, R*0.15, mx, my, R);
+  mg.addColorStop(0, '#ff7260');
+  mg.addColorStop(0.6, '#e03030');
+  mg.addColorStop(1, '#7a1010');
+  ctx.fillStyle = mg;
+  ctx.beginPath(); ctx.arc(mx, my, R, 0, Math.PI*2); ctx.fill();
+  // 愤怒的坤坤脸
+  const f = R / 58;
+  ctx.strokeStyle = '#2b0707'; ctx.fillStyle = '#2b0707';
+  ctx.lineWidth = 3.6 * f; ctx.lineCap = 'round';
+  // 中分头发轮廓（愤怒蹙眉版）
+  ctx.beginPath();
+  ctx.arc(mx, my - 6*f, R*0.92, Math.PI*1.08, Math.PI*1.92);
+  ctx.stroke();
+  // V形怒眉
+  ctx.beginPath();
+  ctx.moveTo(mx - 31*f, my - 16*f);
+  ctx.lineTo(mx - 13*f, my - 7*f);
+  ctx.moveTo(mx + 31*f, my - 16*f);
+  ctx.lineTo(mx + 13*f, my - 7*f);
+  ctx.stroke();
+  // 眼睛（白底红瞳）
+  ctx.fillStyle = '#fdf3f3';
+  ctx.beginPath(); ctx.ellipse(mx - 21*f, my - 2*f, 10*f, 11.5*f, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(mx + 21*f, my - 2*f, 10*f, 11.5*f, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#c00e0e';
+  ctx.beginPath(); ctx.arc(mx - 19*f, my - 1*f, 5.2*f, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(mx + 23*f, my - 1*f, 5.2*f, 0, Math.PI*2); ctx.fill();
+  // 嘴（愤怒下弯）
+  ctx.beginPath();
+  ctx.arc(mx, my + 24*f, 15*f, Math.PI*1.12, Math.PI*1.88);
+  ctx.stroke();
+  // 怒汗珠
+  ctx.fillStyle = 'rgba(255,255,255,.55)';
+  ctx.beginPath(); ctx.ellipse(mx - 40*f, my + 10*f, 3*f, 5.5*f, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(mx + 40*f, my + 18*f, 3*f, 5.5*f, 0, 0, Math.PI*2); ctx.fill();
 }
 
 function drawGround(){
   const g = ctx.createLinearGradient(0, groundY, 0, H);
-  g.addColorStop(0, '#f2e3cc');
-  g.addColorStop(1, '#e6d2b5');
+  g.addColorStop(0, '#251a3a');
+  g.addColorStop(1, '#130d22');
   ctx.fillStyle = g;
   ctx.fillRect(0, groundY, W, H - groundY);
-  ctx.fillStyle = 'rgba(255,255,255,.5)';
+  // 顶部发光边缘
+  ctx.fillStyle = 'rgba(143,107,255,.4)';
   ctx.fillRect(0, groundY, W, 2);
+  // 地面暗纹（世界坐标无缝，防断片）
+  ctx.fillStyle = 'rgba(255,255,255,.05)';
+  const span = W + 240;
+  for(let i = 0; i < 14; i++){
+    let sx = ((i * 271 + 40 - camX) % span + span) % span - 120;
+    const sy = groundY + 18 + (i % 4) * 24;
+    for(const ox of [0, -span, span]){
+      const x = sx + ox;
+      if(x < -60 || x > W + 60) continue;
+      ctx.beginPath();
+      ctx.ellipse(x, sy, 26 + (i % 3) * 15, 7, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+}
+
+function drawFog(){
+  // 底部雾（渐变 + 漂移雾层）
+  const g = ctx.createLinearGradient(0, groundY - 60, 0, H);
+  g.addColorStop(0, 'rgba(16,10,28,0)');
+  g.addColorStop(1, 'rgba(16,10,28,.9)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(120,90,180,.07)';
+  const span = W + 400;
+  for(let i = 0; i < 6; i++){
+    let sx = ((i * 389 + 80 - camX * 0.3) % span + span) % span - 200;
+    const sy = groundY + 10 + (i % 3) * 26;
+    for(const ox of [0, -span, span]){
+      const x = sx + ox;
+      if(x < -120 || x > W + 120) continue;
+      ctx.beginPath();
+      ctx.ellipse(x, sy, 150 + (i % 3) * 90, 26 + (i % 2) * 14, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
 }
 
 function shade(hex, amt){
@@ -1000,6 +1204,13 @@ function roundRect(x, y, w, h, r){
   ctx.closePath();
 }
 
+const BOX_STYLES = {
+  normal:  { top:'#403858', front:'#2a2340', glow:'rgba(143,107,255,.85)', vein:'rgba(143,107,255,.13)' },
+  spring:  { top:'#25523d', front:'#173426', glow:'rgba(62,240,138,.9)',  vein:'rgba(62,240,138,.16)' },
+  cracked: { top:'#4d3c2a', front:'#35291c', glow:'rgba(255,90,60,.75)', vein:'rgba(255,90,60,.12)' },
+  coin:    { top:'#514017', front:'#382c0e', glow:'rgba(255,215,0,.9)',  vein:'rgba(255,215,0,.14)' }
+};
+
 function drawBox(b){
   let x = b.x - camX, w = b.w;
   let yOff = 0, rot = 0;
@@ -1008,6 +1219,7 @@ function drawBox(b){
     rot = b.rot;
   }
   if(x + w < -20 || x > W + 20) return;
+  const st = BOX_STYLES[b.type] || BOX_STYLES.normal;
   ctx.save();
   if(rot){
     ctx.translate(x + w/2, topY + (groundY - topY)/2);
@@ -1015,10 +1227,10 @@ function drawBox(b){
     ctx.translate(-(x + w/2), -(topY + (groundY - topY)/2));
   }
   if(b.dead) ctx.globalAlpha = Math.max(0, 1 - b.fallT * 0.9);
-  // 侧面
+  // 侧面（暗石 + 竖向能量纹）
   const g = ctx.createLinearGradient(0, topY, 0, groundY);
-  g.addColorStop(0, b.front);
-  g.addColorStop(1, shade(b.front, -0.22));
+  g.addColorStop(0, st.front);
+  g.addColorStop(1, shade(st.front, -0.28));
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.moveTo(x + w*0.06, topY + yOff);
@@ -1027,16 +1239,41 @@ function drawBox(b){
   ctx.lineTo(x, groundY + yOff);
   ctx.closePath();
   ctx.fill();
-  // 顶面
-  ctx.fillStyle = b.top;
+  // 竖向裂纹能量线
+  ctx.strokeStyle = st.vein;
+  ctx.lineWidth = 2;
+  for(let i = 1; i <= 3; i++){
+    const vx = x + w * (0.14 + i * 0.24);
+    const bend = (i % 2) ? 4 : -4;
+    ctx.beginPath();
+    ctx.moveTo(vx, topY + yOff + 22);
+    ctx.lineTo(vx + bend * 0.5, (topY + groundY)/2 + yOff);
+    ctx.lineTo(vx - bend, groundY + yOff - 8);
+    ctx.stroke();
+  }
+  // 底部辉光
+  ctx.fillStyle = st.vein;
+  ctx.fillRect(x + 2, groundY + yOff - 3, w - 4, 3);
+  // 顶面（亮石 + 双层伪辉光描边，性能友好）
+  ctx.fillStyle = st.top;
   roundRect(x, topY + yOff, w, 26, 9);
   ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,.55)';
-  roundRect(x + 5, topY + yOff + 4, w - 10, 8, 5);
+  ctx.strokeStyle = st.glow;
+  ctx.lineWidth = 2.5;
+  roundRect(x + 1, topY + yOff + 1, w - 2, 24, 8);
+  ctx.stroke();
+  ctx.globalAlpha = 0.28;
+  ctx.lineWidth = 6;
+  roundRect(x + 1, topY + yOff + 1, w - 2, 24, 8);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  // 顶面斜向高光
+  ctx.fillStyle = 'rgba(255,255,255,.12)';
+  roundRect(x + 5, topY + yOff + 4, w - 10, 7, 4);
   ctx.fill();
   const cx = x + w/2;
-  // 中心标定菱形（每个台子）
-  ctx.fillStyle = 'rgba(255,255,255,.85)';
+  // 中心标定（发光菱形）
+  ctx.fillStyle = 'rgba(255,255,255,.95)';
   ctx.beginPath();
   ctx.moveTo(cx, topY + yOff + 15);
   ctx.lineTo(cx + 5, topY + yOff + 21);
@@ -1044,17 +1281,25 @@ function drawBox(b){
   ctx.lineTo(cx - 5, topY + yOff + 21);
   ctx.closePath();
   ctx.fill();
+  ctx.fillStyle = st.glow;
+  ctx.beginPath();
+  ctx.moveTo(cx, topY + yOff + 14);
+  ctx.lineTo(cx + 6, topY + yOff + 21);
+  ctx.lineTo(cx, topY + yOff + 28);
+  ctx.lineTo(cx - 6, topY + yOff + 21);
+  ctx.closePath();
+  ctx.fill();
   // 目标台子：金色 PERFECT 区（脉冲）
   if(b === player.targetBox && state !== STATE.READY && state !== STATE.DEAD){
     const pz = perfectZone(b);
-    const a = 0.5 + 0.3 * Math.sin(gameT * 7);
+    const a = 0.55 + 0.3 * Math.sin(gameT * 7);
     ctx.fillStyle = 'rgba(255,215,0,' + a.toFixed(2) + ')';
     roundRect(cx - pz, topY + yOff + 14, pz*2, 9, 4);
     ctx.fill();
   }
   // 特殊台子标记
   if(b.type === 'coin'){
-    ctx.font = '15px sans-serif';
+    ctx.font = '16px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('💰', cx, topY + yOff - 8);
   } else if(b.type === 'spring'){
@@ -1065,8 +1310,15 @@ function drawBox(b){
     ctx.lineTo(cx, topY + yOff - 4);
     ctx.closePath();
     ctx.fill();
+    // 弹簧线圈
+    ctx.strokeStyle = st.glow;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 5, topY + yOff + 20);
+    ctx.quadraticCurveTo(cx + 5, topY + yOff + 22, cx - 5, topY + yOff + 25);
+    ctx.stroke();
   } else if(b.type === 'cracked'){
-    ctx.strokeStyle = 'rgba(90,70,50,.55)';
+    ctx.strokeStyle = 'rgba(30,16,8,.8)';
     ctx.lineWidth = 2;
     const fy = (topY + groundY) / 2;
     ctx.beginPath();
@@ -1081,10 +1333,18 @@ function drawBox(b){
     ctx.stroke();
   }
   if(b.moving){
-    ctx.fillStyle = 'rgba(255,255,255,.85)';
-    ctx.font = 'bold 15px sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,.9)';
+    ctx.font = 'bold 16px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('⇄', cx, (topY + groundY) / 2 + yOff + 5);
+    // 移动方向光点
+    ctx.fillStyle = st.glow;
+    ctx.beginPath();
+    ctx.arc(x + 4, topY + yOff + 10, 2.5, 0, Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x + w - 4, topY + yOff + 10, 2.5, 0, Math.PI*2);
+    ctx.fill();
   }
   ctx.restore();
 }
@@ -1289,12 +1549,76 @@ function drawChargeBar(){
 function render(){
   drawSky();
   drawGround();
+  drawFog();
   for(const b of boxes) drawBox(b);
   drawPlayer();
+  drawFans();
+  drawLetters();
   drawParticles();
   drawPopups();
   drawAimGuide();
   drawChargeBar();
+  if(flashT > 0){
+    ctx.fillStyle = 'rgba(255,30,30,' + (flashT / 0.7 * 0.3).toFixed(3) + ')';
+    ctx.fillRect(0, 0, W, H);
+  }
+}
+
+function drawFans(){
+  for(const f of fans){
+    const fx = f.x - camX;
+    const bob = Math.sin(gameT * 6 + f.t * 8) * 3;
+    ctx.save();
+    ctx.translate(fx, f.y + bob);
+    // 真爱粉（暗色小人 + 应援棒 + 爱心）
+    ctx.fillStyle = '#1c1530';
+    ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI*2); ctx.fill();
+    ctx.fillRect(-7, 6, 14, 14);
+    ctx.strokeStyle = '#ff6b9d'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(6, 10); ctx.lineTo(13, 18); ctx.stroke();
+    ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('💗', 0, -12);
+    const w = 0.6 + 0.4 * Math.sin(gameT * 12);
+    ctx.fillStyle = 'rgba(255,60,80,' + w.toFixed(2) + ')';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.fillText('⚠', 0, -26);
+    ctx.restore();
+  }
+}
+
+function drawLetters(){
+  for(const l of letters){
+    const lx = l.x - camX;
+    ctx.save();
+    ctx.translate(lx, l.y);
+    ctx.rotate(l.rot);
+    // 红光拖尾
+    const tr = ctx.createLinearGradient(0, -44, 0, 14);
+    tr.addColorStop(0, 'rgba(255,60,60,0)');
+    tr.addColorStop(1, 'rgba(255,60,60,.38)');
+    ctx.fillStyle = tr;
+    ctx.fillRect(-12, -44, 24, 58);
+    // 律师函字样
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('律师函', 0, -14);
+    // 信封
+    ctx.fillStyle = '#f5ead6';
+    ctx.beginPath();
+    if(ctx.roundRect){ ctx.roundRect(-16, -12, 32, 24, 3); } else { ctx.rect(-16, -12, 32, 24); }
+    ctx.fill();
+    // 封口折线
+    ctx.strokeStyle = '#c9b896'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(-16, -12); ctx.lineTo(0, 2); ctx.lineTo(16, -12); ctx.stroke();
+    // 红印章
+    ctx.fillStyle = '#e02020';
+    ctx.beginPath(); ctx.arc(0, 6, 5.5, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 7px sans-serif';
+    ctx.fillText('函', 0, 8.5);
+    ctx.restore();
+  }
 }
 
 /* ---------------- 主循环 ---------------- */
@@ -1334,6 +1658,9 @@ window.__game = {
   get coins(){ return coins; },
   get diedBy(){ return diedBy; },
   get timeLeft(){ return timeLeft; },
+  get redMoon(){ return redMoon; },
+  get fans(){ return fans; },
+  get letters(){ return letters; },
   setMode: function(m){ mode = m; newGame(); state = STATE.READY; },
   start: function(){ startGame(); },
   press: function(){ press({ preventDefault(){} }); },
