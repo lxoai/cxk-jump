@@ -797,7 +797,7 @@ function landOn(box, scored){
     if(!player.targetBox) player.targetBox = boxes[1];
 
     const isP = box.canPerfect !== false && isPerfect(box, player.x);
-    const base = (box.type === 'cracked') ? 20 : 10;
+    const base = (box.type === 'cracked') ? 15 : 5;
     if(isP){
       combo++; maxCombo = Math.max(maxCombo, combo);
       mult = Math.min(5, 1 + 0.5 * (combo - 1));
