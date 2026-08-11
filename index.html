@@ -89,6 +89,9 @@
   .rc-amt small { font-size:12px; color:#aaa; font-weight:400; }
   .rc-buy { font-size:16px; font-weight:800; color:#5fa8e0; }
   .rc-first { font-size:11px; color:#ff6b3c; font-weight:700; }
+  #payOverlay { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(20,30,45,.6); z-index:36; backdrop-filter:blur(3px); }
+  #payOverlay.show { display:flex; }
+  #payQr { width:190px; height:190px; border-radius:12px; margin-top:8px; box-shadow:0 4px 16px rgba(0,0,0,.15); }
   #cardImg { max-width:210px; max-height:290px; border-radius:12px; margin-top:10px; box-shadow:0 8px 24px rgba(0,0,0,.18); display:none; }
   #shareUrl { margin-top:8px; font-size:12px; color:#888; word-break:break-all; line-height:1.5; }
   .toast { position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:rgba(30,40,55,.85); color:#fff; padding:9px 20px; border-radius:22px; font-size:14px; opacity:0; transition:opacity .3s; pointer-events:none; z-index:20; white-space:nowrap; }
@@ -206,10 +209,22 @@
 <div id="rechargeOverlay">
   <div class="panel">
     <h2>💰 金币充值</h2>
-    <div class="sub" id="rechargeNote">测试模式：点击即到账（正式支付接入后生效）</div>
+    <div class="sub" id="rechargeNote">选择套餐，扫码付款后自动/自助到账</div>
     <div id="rechargeList"></div>
-    <div style="font-size:11px;color:#aaa;margin-top:10px;">正式版将接入微信/支付宝或 TapTap 支付</div>
+    <div style="font-size:11px;color:#aaa;margin-top:10px;">支付方式：个人微信收款码（手动确认）</div>
     <button class="btn" id="rechargeClose">关闭</button>
+  </div>
+</div>
+
+<div id="payOverlay">
+  <div class="panel">
+    <h2>💳 确认支付</h2>
+    <div class="sub" id="payInfo"></div>
+    <div id="payQrWrap"><img id="payQr" alt="收款码"></div>
+    <div style="font-size:12px;color:#888;margin-top:6px;" id="payNote">请用微信扫描收款码付款</div>
+    <div style="font-size:11px;color:#aaa;margin-top:4px;" id="payOrder">订单号：-</div>
+    <button class="btn" id="payConfirmBtn">✅ 我已支付，发放金币</button>
+    <button class="btn ghost" id="payCancelBtn">取消</button>
   </div>
 </div>
 
@@ -731,6 +746,56 @@ function buildTitleRow(){
   });
 }
 
+/* ================= 支付配置 =================
+ * PAY_MODE:
+ *   'manual' - 个人微信收款码（0 注册，立刻可用）：玩家扫码付款后点"我已支付"自助确认
+ *   'hupi'   - 虎皮椒（需注册个人商户，绑定微信收款码）：下单接口出二维码，轮询自动到账
+ * 手动模式只需把你的微信收款码截图命名为 wechat_qr.png 放进游戏目录即可
+ */
+const PAY_MODE = 'manual';
+const PAY_QR = 'wechat_qr.svg';      // manual 模式收款码图片（占位 svg，替换为 wechat_qr.png 亦可）
+const HUPI = {
+  appid: '', appsecret: '', pid: 0,  // 虎皮椒配置（https://www.xunhupay.com 注册后填写）
+  orderApi: 'https://api.xunhupay.com/payment/do.html',
+  queryApi: 'https://api.xunhupay.com/payment/query.html'
+};
+let currentPkg = null, currentOrder = null;
+function genOrderId(){ return 'CXK' + Date.now().toString(36).toUpperCase() + ((Math.random() * 1000) | 0); }
+function openPay(pkg){
+  currentPkg = pkg;
+  currentOrder = genOrderId();
+  const got = pkg.first ? pkg.coins * 2 : pkg.coins;
+  document.getElementById('payInfo').textContent = '¥' + pkg.rmb + ' → ' + got + ' 金币' + (pkg.first ? '（首充双倍）' : '');
+  document.getElementById('payOrder').textContent = '订单号：' + currentOrder;
+  document.getElementById('payQr').src = PAY_QR;
+  document.getElementById('payNote').textContent = PAY_MODE === 'manual' ? '请用微信扫描收款码付款，付完点下方按钮' : '请用微信扫描付款二维码';
+  document.getElementById('payConfirmBtn').style.display = PAY_MODE === 'manual' ? 'block' : 'none';
+  document.getElementById('payOverlay').classList.add('show');
+  if(PAY_MODE === 'hupi') hupiCreateOrder(pkg, got);
+}
+function confirmPaid(){
+  if(!currentPkg) return;
+  const got = currentPkg.first ? currentPkg.coins * 2 : currentPkg.coins;
+  addCoin(got);
+  // 记录订单（供作者核销对账）
+  const orders = JSON.parse(localStorage.getItem('cxk_orders') || '[]');
+  orders.push({ id: currentOrder, rmb: currentPkg.rmb, coins: got, ts: Date.now() });
+  localStorage.setItem('cxk_orders', JSON.stringify(orders.slice(-50)));
+  document.getElementById('payOverlay').classList.remove('show');
+  showToast('充值成功：+' + got + ' 金币 🎉');
+  burst(W/2, H*0.4, '#ffd700', 30);
+  playCoin();
+  currentPkg = null;
+}
+// 虎皮椒（注册后启用）：下单获取付款二维码 + 轮询订单状态自动到账
+function hupiCreateOrder(pkg, got){
+  showToast('虎皮椒未配置，暂用手动收款码模式');
+  document.getElementById('payConfirmBtn').style.display = 'block';
+  document.getElementById('payNote').textContent = '请用微信扫描收款码付款，付完点下方按钮';
+}
+function hupiQuery(){
+  // TODO: 用 fetch 请求 HUPI.queryApi（trade_order=currentOrder），已支付则发放金币并关闭弹窗
+}
 function buildRechargeList(){
   const list = document.getElementById('rechargeList');
   list.innerHTML = '';
@@ -740,17 +805,19 @@ function buildRechargeList(){
     div.innerHTML = '<div><span class="rc-amt">' + p.coins + '</span> <small>金币</small>'
       + (p.first ? '<div class="rc-first">首充双倍！</div>' : '') + '</div>'
       + '<span class="rc-buy">¥' + p.rmb + '</span>';
-    div.addEventListener('click', function(){ recharge(p); });
+    div.addEventListener('click', function(){ openPay(p); });
     list.appendChild(div);
   });
 }
 function recharge(pkg){
-  // 测试模式：免费到账。正式版在此接入支付 SDK（微信/支付宝商户号 或 TapTap 内支付）
-  const got = pkg.first ? pkg.coins * 2 : pkg.coins;
-  addCoin(got);
-  showToast('测试充值：¥' + pkg.rmb + ' → ' + got + ' 金币到账 🎉');
-  burst(W/2, H*0.4, '#ffd700', 26);
+  // 兼容旧入口：直接打开支付确认
+  openPay(pkg);
 }
+document.getElementById('payConfirmBtn').addEventListener('click', confirmPaid);
+document.getElementById('payCancelBtn').addEventListener('click', function(){
+  document.getElementById('payOverlay').classList.remove('show');
+  currentPkg = null;
+});
 function payRevive(){
   if(coins < 30 || reviveUsed) return;
   coins -= 30;

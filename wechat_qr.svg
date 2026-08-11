@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300">
+  <rect width="300" height="300" rx="16" fill="#f6f8fb"/>
+  <rect x="28" y="28" width="244" height="244" rx="12" fill="none" stroke="#e0688a" stroke-width="3" stroke-dasharray="10 8"/>
+  <text x="150" y="135" font-size="22" text-anchor="middle" fill="#455a75" font-family="sans-serif">微信收款码</text>
+  <text x="150" y="168" font-size="14" text-anchor="middle" fill="#aaa" font-family="sans-serif">把收款码截图替换此文件</text>
+  <text x="150" y="192" font-size="12" text-anchor="middle" fill="#c9c9c9" font-family="sans-serif">wechat_qr.png / wechat_qr.svg</text>
+</svg>
