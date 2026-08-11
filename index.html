@@ -15,6 +15,7 @@
   #best { font-size:13px; opacity:.75; margin-top:2px; }
   #coinEl { font-size:15px; font-weight:700; color:#e8a020; margin-top:3px; }
   #comboEl { font-size:16px; font-weight:800; color:#ff9d00; margin-top:4px; text-shadow:0 0 10px rgba(255,157,0,.55); display:none; }
+  #buffEl { font-size:13px; font-weight:800; margin-top:3px; color:#7be0ff; text-shadow:0 0 8px rgba(123,224,255,.6); min-height:16px; }
   #modeTag { font-size:11px; color:#8a97ad; margin-top:2px; opacity:.8; }
   #timerEl { position:fixed; top:14px; left:50%; transform:translateX(-50%); font-size:34px; font-weight:800; color:#455a75;
     text-shadow:0 2px 8px rgba(255,255,255,.9); z-index:5; display:none; }
@@ -111,6 +112,7 @@
   <div id="livesEl">❤️❤️❤️</div>
   <div id="coinEl">💰 0</div>
   <div id="comboEl"></div>
+  <div id="buffEl"></div>
   <div id="modeTag"></div>
 </div>
 <div id="timerEl"></div>
@@ -197,6 +199,7 @@ const jumpsEl = document.getElementById('jumps');
 const bestEl = document.getElementById('best');
 const coinEl = document.getElementById('coinEl');
 const comboEl = document.getElementById('comboEl');
+const buffEl = document.getElementById('buffEl');
 const modeTagEl = document.getElementById('modeTag');
 const timerEl = document.getElementById('timerEl');
 const overlay = document.getElementById('overlay');
@@ -266,6 +269,7 @@ let playerBullets = [], lionBullets = [];
 let lion = null, lionPending = 0, nextLionScore = 100, nextBigLionScore = 1000;
 let vehicle = null, nextVehScore = 600;
 let lives = 3, invincible = 0;
+let lionGap = 100, rapidT = 0, drops = [];
 
 const player = { x:0, y:0, vx:0, vy:0, rot:0, sx:1, sy:1, targetBox:null, landed:false, standingBox:null, springLaunch:false };
 
@@ -355,10 +359,11 @@ function genParams(){
   return { wMin: 84 - d*0.7, wMax: 132 - d*0.7, gapMin: 40 + d*1.6, gapMax: Math.min(148 + d*1.6, gapCap) };
 }
 
-function makeBox(baseX, w, type, moving, plant){
+function makeBox(baseX, w, type, moving, plant, item){
   const c = pick(COLORS);
   const b = { baseX:baseX, x:baseX, w:w, type:type, moving:moving, top:c[0], front:c[1], canPerfect:true };
   if(plant) b.plant = plant;
+  if(item) b.item = item;
   if(type === 'spring'){ b.top = '#b6f2a8'; b.front = '#67cf57'; b.canPerfect = false; }
   if(type === 'cracked'){ b.top = '#cfc3b4'; b.front = '#a89b8a'; }
   if(moving){
@@ -389,8 +394,12 @@ function spawnNext(){
   if(idx >= 3 && w >= 80 && (type === 'normal' || type === 'coin') && rng() < 0.10){
     plant = { x: (rng() < 0.5 ? 10 : w - 10) }; // 葵菜钉在台子边缘
   }
+  let item = null;
+  if(idx >= 3 && w >= 90 && (type === 'normal' || type === 'coin') && rng() < 0.07){
+    item = { type: pickItemType() }; // 随机道具悬浮台子上方
+  }
   const baseX = (last.moving ? last.baseX : last.x) + last.w + gap;
-  boxes.push(makeBox(baseX, w, type, moving, plant));
+  boxes.push(makeBox(baseX, w, type, moving, plant, item));
 }
 
 function newGame(){
@@ -403,6 +412,7 @@ function newGame(){
   nextLionScore = 100; nextBigLionScore = 1000;
   vehicle = null; nextVehScore = 600;
   lives = 3; invincible = 0;
+  lionGap = 100; rapidT = 0; drops.length = 0;
   updateLivesHud();
   redMoonTag.style.display = 'none';
   if(mode === 'daily') rng = mulberry32(hashStr('cxk-jump-' + dateStr()));
@@ -766,6 +776,12 @@ function updateComboHud(){
     comboEl.style.display = 'none';
   }
 }
+function updateBuffHud(){
+  let s = '';
+  if(rapidT > 0) s += '⚡' + Math.ceil(rapidT) + 's ';
+  if(invincible > 0) s += '🛡️' + Math.ceil(invincible) + 's';
+  buffEl.textContent = s;
+}
 function popup(text, color, big, x, y){
   popups.push({
     x: (x !== undefined) ? x : player.x - camX,
@@ -798,6 +814,11 @@ function landOn(box, scored){
     burst(player.x - camX, topY - 20, '#ffd23e', 10);
     hurt('plant');
     return;
+  }
+  // 落地拾取台子上的道具
+  if(box.item){
+    collectItem(box.item.type, player.x - camX, topY - 34);
+    box.item = null;
   }
   player.y = topY;
   player.vx = 0; player.vy = 0;
@@ -954,8 +975,11 @@ function spawnFan(){
 /* ---------------- 对战系统：投篮 & 狮子座 ---------------- */
 function fire(){
   if(fireCd > 0 || state === STATE.READY || state === STATE.DEAD) return;
-  fireCd = 0.3;
-  playerBullets.push({ x: player.x, y: player.y - 24, vx: 520, rot: 0 });
+  fireCd = rapidT > 0 ? 0.15 : 0.3;
+  // 自动瞄准：有狮子时朝狮子发射，否则平射
+  const l = (lion && !lion.dead) ? lion : null;
+  const ang = l ? Math.atan2((topY - 26) - (player.y - 24), (l.x - player.x)) : 0;
+  playerBullets.push({ x: player.x, y: player.y - 24, vx: Math.cos(ang) * 520, vy: Math.sin(ang) * 520, rot: 0, home: !!l });
   tone(520, 0.07, 'square', 0.07);
 }
 
@@ -990,9 +1014,35 @@ function killLion(){
   popup(big ? '精英狮子击退！+200' : '狮子座击退！+50', '#ffb400', big);
   addScore(pts(big ? 200 : 50));
   addCoin(big ? 15 : 3);
+  // 击杀掉落道具：大狮子必掉，小狮子 30%
+  if(big || Math.random() < 0.3) dropItem(lion.x, topY - 30);
   playSpring();
   lion.dead = true; lion.deadT = 0;
   checkMilestones(false);
+}
+
+/* ---------------- 随机道具 ---------------- */
+const ITEM_ICOS = { heart:'❤️', rapid:'⚡', shield:'🛡️', coins:'💰' };
+function pickItemType(){
+  const arr = ['heart', 'rapid', 'shield', 'coins'];
+  return arr[(Math.random() * arr.length) | 0];
+}
+function dropItem(x, y){
+  drops.push({ x: x, y: y, type: pickItemType(), t: 0 });
+}
+function collectItem(type, sx, sy){
+  if(type === 'heart'){
+    if(lives < 3){ lives++; updateLivesHud(); popup('❤️ +1 生命', '#ff6b9d', true, sx, sy); }
+    else { addCoin(5); popup('生命已满 💰+5', '#ffb64d', false, sx, sy); }
+  } else if(type === 'rapid'){
+    rapidT = 6; popup('⚡ 速射模式 6s', '#7be0ff', true, sx, sy);
+  } else if(type === 'shield'){
+    invincible = Math.max(invincible, 5); popup('🛡️ 护盾 5s', '#6bb5ff', true, sx, sy);
+  } else if(type === 'coins'){
+    addCoin(10); popup('💰 +10 金币', '#ffb64d', true, sx, sy);
+  }
+  burst(sx, sy, '#ffd700', 14);
+  playCoin();
 }
 
 function spawnVehicle(){
@@ -1009,14 +1059,16 @@ function spawnVehicle(){
 }
 
 function checkMilestones(landing){
-  // 狮子只在落地时生成（击杀加分不能触发无限刷狮循环）
-  while(nextLionScore <= score){
-    nextLionScore += 100;
-    if(landing && !lion) spawnLion(false);
-  }
+  // 大狮子优先：1000 的倍数（先判大，避免槽位被小狮子占掉导致大狮子永远不刷）
   while(nextBigLionScore <= score){
     nextBigLionScore += 1000;
     if(landing && !lion) spawnLion(true);
+  }
+  // 小狮子：间隔随进度增长（100→150→200…），后期不再无限刷
+  while(nextLionScore <= score){
+    nextLionScore += lionGap;
+    lionGap += 50;
+    if(landing && !lion) spawnLion(false);
   }
   while(nextVehScore <= score){
     nextVehScore += 600;
@@ -1101,6 +1153,14 @@ function update(dt){
     player.y += player.vy * dt;
     player.rot = Math.min(player.vx * 0.0011, 0.32);
 
+    // 空中拾取道具（跳越台子时）
+    for(const bx of boxes){
+      if(bx.item && Math.abs(player.x - (bx.x + bx.w/2)) < 30 && player.y > topY - 140){
+        collectItem(bx.item.type, bx.x - camX + bx.w/2, topY - 34);
+        bx.item = null;
+      }
+    }
+
     // 落地检测：脚越过台面后逐帧判断（移动台子实时位置）
     if(player.y >= topY && !player.landed){
       const cur = boxes[0];
@@ -1169,6 +1229,19 @@ function update(dt){
   }
   if(flashT > 0) flashT -= dt;
   if(invincible > 0) invincible -= dt; // 无敌计时（上次漏了递减，导致永远死不了）
+  if(rapidT > 0) rapidT -= dt;
+  updateBuffHud();
+  // 击杀掉落的道具：浮动拾取，8s 过期
+  for(let i = drops.length - 1; i >= 0; i--){
+    const d = drops[i];
+    if(!d) continue;
+    d.t += dt;
+    if(d.t > 8){ drops.splice(i, 1); continue; }
+    if(state !== STATE.DEAD && state !== STATE.READY && Math.abs(d.x - player.x) < 32 && Math.abs(d.y - (player.y - 20)) < 42){
+      collectItem(d.type, d.x - camX, d.y);
+      drops.splice(i, 1);
+    }
+  }
 
   // 射击：连发冷却 + 玩家篮球子弹
   fireCd -= dt;
@@ -1176,7 +1249,19 @@ function update(dt){
   for(let i = playerBullets.length - 1; i >= 0; i--){
     const b = playerBullets[i];
     if(!b) continue;
+    // 轻度追踪：朝狮子转向（对射更顺手）
+    if(b.home && lion && !lion.dead){
+      const tx = lion.x - b.x, ty = (topY - 26) - b.y;
+      const d = Math.hypot(tx, ty) || 1;
+      const sp = Math.hypot(b.vx, b.vy) || 1;
+      const nx = b.vx / sp + (tx / d) * 0.07;
+      const ny = b.vy / sp + (ty / d) * 0.07;
+      const nn = Math.hypot(nx, ny) || 1;
+      b.vx = (nx / nn) * 520;
+      b.vy = (ny / nn) * 520;
+    }
     b.x += b.vx * dt;
+    b.y += b.vy * dt;
     b.rot += 10 * dt;
     let hit = false;
     if(lion && !lion.dead && Math.abs(b.x - lion.x) < 26 && Math.abs(b.y - (topY - 26)) < 36){
@@ -1186,7 +1271,7 @@ function update(dt){
       tone(400, 0.06, 'square', 0.08);
       if(lion.hp <= 0) killLion();
     }
-    if(hit || b.x > camX + W + 60) playerBullets.splice(i, 1);
+    if(hit || b.x > camX + W + 60 || b.y < -60 || b.y > H + 60) playerBullets.splice(i, 1);
   }
 
   // 狮子：AI 射击 + 死亡动画
@@ -1672,6 +1757,18 @@ function drawBox(b){
     ctx.beginPath(); ctx.arc(px - 1.6, topY + yOff - 3, 1, 0, Math.PI*2); ctx.fill();
     ctx.beginPath(); ctx.arc(px + 1.6, topY + yOff - 3, 1, 0, Math.PI*2); ctx.fill();
   }
+  // 道具（悬浮台子上方，发光漂浮）
+  if(b.item){
+    const ix = x + w/2;
+    const bob = Math.sin(gameT * 3 + b.baseX * 0.01) * 4;
+    ctx.save();
+    ctx.font = '24px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#ffd700';
+    ctx.shadowBlur = 12;
+    ctx.fillText(ITEM_ICOS[b.item.type] || '?', ix, topY + yOff - 20 + bob);
+    ctx.restore();
+  }
   if(b.moving){
     ctx.fillStyle = 'rgba(255,255,255,.9)';
     ctx.font = 'bold 16px sans-serif';
@@ -1899,6 +1996,19 @@ function drawChargeBar(){
   ctx.fill();
 }
 
+function drawDrops(){
+  for(const d of drops){
+    const bob = Math.sin(gameT * 3 + d.t * 5) * 4;
+    ctx.save();
+    ctx.font = '24px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#ffd700';
+    ctx.shadowBlur = 14;
+    ctx.fillText(ITEM_ICOS[d.type] || '?', d.x - camX, d.y + bob);
+    ctx.restore();
+  }
+}
+
 function render(){
   drawSky();
   drawGround();
@@ -1908,6 +2018,7 @@ function render(){
   drawLion();
   drawFans();
   drawLetters();
+  drawDrops();
   drawPlayerBullets();
   drawLionBullets();
   drawVehicle();
