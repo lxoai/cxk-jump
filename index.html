@@ -1168,6 +1168,7 @@ function update(dt){
     }
   }
   if(flashT > 0) flashT -= dt;
+  if(invincible > 0) invincible -= dt; // 无敌计时（上次漏了递减，导致永远死不了）
 
   // 射击：连发冷却 + 玩家篮球子弹
   fireCd -= dt;
