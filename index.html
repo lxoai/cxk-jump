@@ -76,6 +76,19 @@
   .skin-ico { font-size:24px; }
   .skin-name { font-size:12px; color:#455a75; font-weight:700; }
   .skin-price { font-size:11px; color:#e8a020; }
+  .title-row { display:flex; gap:8px; justify-content:center; margin-top:10px; flex-wrap:wrap; }
+  .title-btn { padding:7px 12px; border-radius:16px; border:2px solid #e5e9f0; background:#fff; color:#455a75; font-size:12px; font-weight:700; cursor:pointer; }
+  .title-btn.active { border-color:#ffb400; color:#c98a1a; background:#fff8e6; }
+  .title-btn .p { color:#e8a020; font-size:11px; }
+  .start-actions { display:flex; gap:10px; justify-content:center; margin-top:8px; }
+  #rechargeOverlay { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(20,30,45,.55); z-index:35; backdrop-filter:blur(3px); }
+  #rechargeOverlay.show { display:flex; }
+  .rc-item { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 14px; border-radius:12px; background:#f6f8fb; margin-top:8px; cursor:pointer; border:2px solid transparent; }
+  .rc-item:active { border-color:#e0688a; background:#ffeef4; }
+  .rc-amt { font-size:22px; font-weight:800; color:#e0688a; }
+  .rc-amt small { font-size:12px; color:#aaa; font-weight:400; }
+  .rc-buy { font-size:16px; font-weight:800; color:#5fa8e0; }
+  .rc-first { font-size:11px; color:#ff6b3c; font-weight:700; }
   #cardImg { max-width:210px; max-height:290px; border-radius:12px; margin-top:10px; box-shadow:0 8px 24px rgba(0,0,0,.18); display:none; }
   #shareUrl { margin-top:8px; font-size:12px; color:#888; word-break:break-all; line-height:1.5; }
   .toast { position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:rgba(30,40,55,.85); color:#fff; padding:9px 20px; border-radius:22px; font-size:14px; opacity:0; transition:opacity .3s; pointer-events:none; z-index:20; white-space:nowrap; }
@@ -136,6 +149,7 @@
     <div style="margin-top:4px;font-size:13px;color:#aaa;">历史最高 <span id="finBest">0</span> 分</div>
     <img id="cardImg" alt="成绩卡">
     <button class="btn" id="restartBtn">再来一局</button>
+    <button class="btn ghost" id="reviveBtn" style="display:none;">💰30 金币复活</button>
     <button class="btn ghost" id="shareCardBtn">📸 分享成绩卡</button>
     <button class="btn ghost" id="shareBtn">分享链接</button>
     <div id="shareUrl"></div>
@@ -177,13 +191,27 @@
       <button class="mode-btn" data-mode="daily">📅 每日</button>
     </div>
     <div class="skin-row" id="skinRow"></div>
-    <div style="font-size:12px;color:#aaa;margin-top:8px;">💰 <span id="startCoins">0</span> · 踩金币台子 / PERFECT 攒金币，解锁皮肤</div>
+    <div class="title-row" id="titleRow"></div>
+    <div style="font-size:12px;color:#aaa;margin-top:8px;">💰 <span id="startCoins">0</span> · 踩金币台子 / PERFECT / 击杀赚金币，解锁皮肤称号</div>
+    <div class="start-actions">
+      <button class="btn ghost" id="rechargeBtn">💰 金币充值</button>
+    </div>
     <button class="btn" id="startBtn">开始游戏</button>
     <button class="btn ghost" id="lbBtn">🏆 排行榜</button>
     <div class="credit">←→ 走位 · 按住蓄力跳 · J 投篮 · 由 lxo 制作</div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
+
+<div id="rechargeOverlay">
+  <div class="panel">
+    <h2>💰 金币充值</h2>
+    <div class="sub" id="rechargeNote">测试模式：点击即到账（正式支付接入后生效）</div>
+    <div id="rechargeList"></div>
+    <div style="font-size:11px;color:#aaa;margin-top:10px;">正式版将接入微信/支付宝或 TapTap 支付</div>
+    <button class="btn" id="rechargeClose">关闭</button>
+  </div>
+</div>
 
 <audio id="sJump" src="jntm_song.mp3" preload="auto"></audio>
 <audio id="sFail" src="niganma.mp3" preload="auto"></audio>
@@ -214,6 +242,7 @@ const finPerfects = document.getElementById('finPerfects');
 const finCombo = document.getElementById('finCombo');
 const finCoins = document.getElementById('finCoins');
 const cardImg = document.getElementById('cardImg');
+const reviveBtn = document.getElementById('reviveBtn');
 const shareUrl = document.getElementById('shareUrl');
 const toast = document.getElementById('toast');
 const hintEl = document.querySelector('.hint');
@@ -313,8 +342,27 @@ const SKINS = [
   { id:'kun',  name:'坤坤',   ico:'🕺', price:0 },
   { id:'hei',  name:'乌鸡',   ico:'🖤', price:100 },
   { id:'ball', name:'篮球',   ico:'🏀', price:300 },
-  { id:'gold', name:'金鸡', ico:'🐔', price:600 }
+  { id:'gold', name:'金鸡', ico:'🐔', price:600 },
+  { id:'blue', name:'蓝鸡',   ico:'💙', price:400 },
+  { id:'fire', name:'火鸡',   ico:'🔥', price:800 }
 ];
+const TITLES = [
+  { id:'t1', name:'ikun 练习生', ico:'🎓', price:50 },
+  { id:'t2', name:'黑粉头子',   ico:'🖤', price:200 },
+  { id:'t3', name:'鸡你太美传人', ico:'🐔', price:500 },
+  { id:'t4', name:'狮子座守护者', ico:'🦁', price:1000 }
+];
+const TITLE_BADGES = { t1:'🎓', t2:'🖤', t3:'🐔', t4:'🦁' };
+const RECHARGE_PKGS = [
+  { id:'p1', rmb:6,   coins:600,  first:true },
+  { id:'p2', rmb:12,  coins:1300, first:false },
+  { id:'p3', rmb:30,  coins:3500, first:false },
+  { id:'p4', rmb:68,  coins:8000, first:false },
+  { id:'p5', rmb:128, coins:16000, first:false }
+];
+let ownedTitles = (localStorage.getItem('cxk_titles') || '').split(',').filter(Boolean);
+let myTitle = localStorage.getItem('cxk_title') || '';
+let reviveUsed = false;
 let owned = (localStorage.getItem('cxk_skins') || 'kun').split(',');
 let skin = localStorage.getItem('cxk_skin') || 'kun';
 if(!owned.includes(skin)) skin = 'kun';
@@ -421,6 +469,7 @@ function newGame(){
   boxes.push(b0);
   spawnNext(); spawnNext(); spawnNext();
   camX = 0; score = 0; jumps = 0; charge = 0; holdT = 0; deadT = 0;
+  reviveUsed = false;
   combo = 0; mult = 1; perfects = 0; maxCombo = 0;
   coinsAtStart = coins; diedBy = 'fall';
   timeLeft = 60;
@@ -635,6 +684,98 @@ function buildSkinRow(){
   });
 }
 buildSkinRow();
+buildTitleRow();
+
+/* ---------------- 称号 & 充值 & 金币复活 ---------------- */
+function buildTitleRow(){
+  const row = document.getElementById('titleRow');
+  row.innerHTML = '';
+  const none = document.createElement('button');
+  none.className = 'title-btn' + (!myTitle ? ' active' : '');
+  none.textContent = '无称号';
+  none.addEventListener('click', function(){
+    myTitle = '';
+    localStorage.setItem('cxk_title', '');
+    buildTitleRow();
+    showToast('已取消称号');
+  });
+  row.appendChild(none);
+  TITLES.forEach(function(t){
+    const has = ownedTitles.includes(t.id);
+    const btn = document.createElement('button');
+    btn.className = 'title-btn' + (myTitle === t.id ? ' active' : '');
+    const status = !has ? '<span class="p">💰' + t.price + '</span>' : (myTitle === t.id ? '✅' : '点击装备');
+    btn.innerHTML = t.ico + ' ' + t.name + ' ' + status;
+    btn.addEventListener('click', function(){
+      if(has){
+        myTitle = t.id;
+        localStorage.setItem('cxk_title', t.id);
+        buildTitleRow();
+        showToast('称号已装备：' + t.name);
+      } else if(coins >= t.price){
+        coins -= t.price;
+        localStorage.setItem('cxk_coins', coins);
+        ownedTitles.push(t.id);
+        localStorage.setItem('cxk_titles', ownedTitles.join(','));
+        myTitle = t.id;
+        localStorage.setItem('cxk_title', t.id);
+        coinEl.textContent = '💰 ' + coins;
+        startCoinsEl.textContent = coins;
+        buildTitleRow();
+        showToast('获得称号：' + t.name + '！');
+      } else {
+        showToast('金币不够，差 ' + (t.price - coins));
+      }
+    });
+    row.appendChild(btn);
+  });
+}
+
+function buildRechargeList(){
+  const list = document.getElementById('rechargeList');
+  list.innerHTML = '';
+  RECHARGE_PKGS.forEach(function(p){
+    const div = document.createElement('div');
+    div.className = 'rc-item';
+    div.innerHTML = '<div><span class="rc-amt">' + p.coins + '</span> <small>金币</small>'
+      + (p.first ? '<div class="rc-first">首充双倍！</div>' : '') + '</div>'
+      + '<span class="rc-buy">¥' + p.rmb + '</span>';
+    div.addEventListener('click', function(){ recharge(p); });
+    list.appendChild(div);
+  });
+}
+function recharge(pkg){
+  // 测试模式：免费到账。正式版在此接入支付 SDK（微信/支付宝商户号 或 TapTap 内支付）
+  const got = pkg.first ? pkg.coins * 2 : pkg.coins;
+  addCoin(got);
+  showToast('测试充值：¥' + pkg.rmb + ' → ' + got + ' 金币到账 🎉');
+  burst(W/2, H*0.4, '#ffd700', 26);
+}
+function payRevive(){
+  if(coins < 30 || reviveUsed) return;
+  coins -= 30;
+  localStorage.setItem('cxk_coins', coins);
+  coinEl.textContent = '💰 ' + coins;
+  startCoinsEl.textContent = coins;
+  reviveUsed = true;
+  lives = 1;
+  updateLivesHud();
+  invincible = 3;
+  overlay.classList.remove('show');
+  cardImg.style.display = 'none';
+  revivePos();
+  popup('金币复活！🔄', '#ffd700', true, W/2, H*0.3);
+  burst(player.x - camX, topY - 30, '#ffd700', 20);
+  playHurt();
+}
+document.getElementById('reviveBtn').addEventListener('click', payRevive);
+document.getElementById('rechargeBtn').addEventListener('click', function(){
+  document.getElementById('rechargeOverlay').classList.add('show');
+  buildRechargeList();
+});
+document.getElementById('rechargeClose').addEventListener('click', function(){
+  document.getElementById('rechargeOverlay').classList.remove('show');
+});
 
 /* ---------------- 排行榜 ---------------- */
 const LB_PTR = 'https://api.github.com/repos/lxoai/cxk-jump/contents/lb.json';
@@ -740,7 +881,7 @@ async function openLb(){
     list.innerHTML = top.map(function(s, i){
       const medal = i===0 ? '🥇' : (i===1 ? '🥈' : (i===2 ? '🥉' : (i+1)));
       const me = (s.name === myName) ? ' me' : '';
-      return '<div class="lb-item' + me + '"><span class="lb-rank ' + (i<3 ? 'g'+(i+1) : '') + '">' + medal + '</span><span class="lb-name">' + esc(s.name) + '</span><span class="lb-score">' + s.score + ' 分</span><span class="lb-jumps">' + s.jumps + ' 跳</span></div>';
+      return '<div class="lb-item' + me + '"><span class="lb-rank ' + (i<3 ? 'g'+(i+1) : '') + '">' + medal + '</span><span class="lb-name">' + (TITLE_BADGES[s.title] ? TITLE_BADGES[s.title] + ' ' : '') + esc(s.name) + '</span><span class="lb-score">' + s.score + ' 分</span><span class="lb-jumps">' + s.jumps + ' 跳</span></div>';
     }).join('');
   }catch(e){
     list.innerHTML = '<div class="lb-empty">排行榜暂时连不上（网络被墙？），稍后再试~</div>';
@@ -779,7 +920,7 @@ document.getElementById('submitBtn').addEventListener('click', async function(){
   btn.disabled = true;
   btn.textContent = '提交中…';
   try{
-    await lbSubmit({ name: myName, score: score, jumps: jumps, ts: Date.now(), mode: mode, perfects: perfects });
+    await lbSubmit({ name: myName, title: myTitle || '', score: score, jumps: jumps, ts: Date.now(), mode: mode, perfects: perfects });
     showToast('成绩已上榜 🎉');
     document.getElementById('submitRow').style.display = 'none';
     openLb();
@@ -1384,7 +1525,7 @@ function update(dt){
     player.vy += G * dt;
     player.y += player.vy * dt;
     player.rot += 3.5 * dt;
-    if(deadT > 1.1){
+    if(deadT > 1.1 && !overlay.classList.contains('show')){
       finScore.textContent = score;
       finJumps.textContent = jumps;
       finBest.textContent = Math.max(best, score);
@@ -1399,6 +1540,8 @@ function update(dt){
       cardDataUrl = makeCardDataUrl();
       cardImg.src = cardDataUrl;
       cardImg.style.display = 'block';
+      // 金币复活按钮（每次终局可花 30 币复活一次）
+      reviveBtn.style.display = (coins >= 30 && !reviveUsed) ? 'block' : 'none';
     }
   }
 
@@ -1460,14 +1603,22 @@ function makeCardDataUrl(){
   g.fillText('PERFECT × ' + perfects, 320, 502);
   g.fillText('最高连击 × ' + maxCombo, 320, 552);
   g.fillText('金币 +' + (coins - coinsAtStart), 320, 602);
+  if(myTitle){
+    const t = TITLES.find(function(x){ return x.id === myTitle; });
+    if(t){
+      g.fillStyle = '#c98a1a';
+      g.font = 'bold 24px "Microsoft YaHei","PingFang SC",sans-serif';
+      g.fillText(t.ico + ' ' + t.name, 320, 644);
+    }
+  }
   if(redMoon){
     g.fillStyle = '#ff5050';
-    g.font = 'bold 24px "Microsoft YaHei","PingFang SC",sans-serif';
-    g.fillText('🌕 红月觉醒', 320, 644);
+    g.font = 'bold 22px "Microsoft YaHei","PingFang SC",sans-serif';
+    g.fillText('🌕 红月觉醒', 320, 682);
   }
   g.fillStyle = '#e0688a';
   g.font = 'bold 24px "Microsoft YaHei","PingFang SC",sans-serif';
-  g.fillText(pick(MEMES) + '！', 320, 690);
+  g.fillText(pick(MEMES) + '！', 320, 722);
   g.fillStyle = '#bbb';
   g.font = '18px "Microsoft YaHei","PingFang SC",sans-serif';
   g.fillText('由 lxo 制作 · lxoai.github.io/cxk-jump', 320, 856);
@@ -1851,6 +2002,10 @@ function drawPlayer(){
     drawGoldenChicken();
   } else if(skin === 'hei'){
     drawBlackChicken();
+  } else if(skin === 'blue'){
+    drawChicken(BLUE_CHICKEN);
+  } else if(skin === 'fire'){
+    drawChicken(FIRE_CHICKEN);
   } else if(spriteImg.complete && spriteImg.naturalWidth > 0){
     ctx.drawImage(spriteImg, -P_W/2, -P_H/2, P_W, P_H);
   } else {
@@ -1960,6 +2115,20 @@ const BLACK_CHICKEN = {
   spot:'rgba(255,255,255,.75)', spotDots:true,
   head:'#3d3d4a', comb:'#ff5a3c', beak:'#ff9f1c', leg:'#ff9f1c',
   eye:'#111', eyeR:1.3, eyeWhite:'#fff', eyeSpark:false
+};
+
+const BLUE_CHICKEN = {
+  tail:'#2f56a0', body:'#4a7fd9', shade:'rgba(20,50,110,.4)', wing:'#3a66b8',
+  spot:'rgba(255,255,255,.5)', spotDots:false,
+  head:'#5a92e8', comb:'#ff5a3c', beak:'#ff9f1c', leg:'#ff9f1c',
+  eye:'#0e1a3a', eyeR:1.9, eyeSpark:true
+};
+
+const FIRE_CHICKEN = {
+  tail:'#d04010', body:'#ff6a2a', shade:'rgba(180,40,0,.4)', wing:'#e8551a',
+  spot:'rgba(255,230,150,.6)', spotDots:false,
+  head:'#ff8a4a', comb:'#ffd23e', beak:'#ffd23e', leg:'#e8732a',
+  eye:'#5b1a00', eyeR:1.9, eyeSpark:true
 };
 
 // 金色鸡
