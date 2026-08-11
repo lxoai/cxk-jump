@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>鸡你太美 · 跳一跳 v2</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/zcool-kuaile@5.3.0/index.css">
+<title>鸡你太美 · 跳一跳 v3</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body { width:100%; height:100%; overflow:hidden; background:#eef4fb; font-family:"Microsoft YaHei","PingFang SC",sans-serif; user-select:none; -webkit-user-select:none; }
@@ -20,17 +21,28 @@
   #redMoonTag { position:fixed; top:66px; left:50%; transform:translateX(-50%); color:#ff5050; font-size:15px; font-weight:800; letter-spacing:3px;
     text-shadow:0 0 14px rgba(255,60,60,.9); z-index:5; display:none; pointer-events:none; animation:redpulse 1.1s infinite; }
   @keyframes redpulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }
-  #ctrlBar { position:fixed; bottom:16px; left:14px; z-index:7; display:flex; gap:10px; align-items:center; pointer-events:none; }
-  .ctrl-btn { width:54px; height:54px; border-radius:50%; border:none; background:rgba(255,255,255,.8); box-shadow:0 2px 10px rgba(0,0,0,.15);
-    font-size:22px; color:#455a75; cursor:pointer; pointer-events:auto; touch-action:none; user-select:none; -webkit-user-select:none; }
-  .ctrl-btn:active { transform:scale(.92); background:rgba(224,104,138,.85); color:#fff; }
-  #btnFire { background:rgba(255,107,61,.85); color:#fff; font-size:24px; margin-left:6px; }
-  #btnFire:active { background:rgba(224,60,40,.95); }
+  /* 手机操作区：左手走位（左下），右手投篮（右下），拇指分区 */
+  #moveBar { position:fixed; left:14px; bottom:calc(24px + env(safe-area-inset-bottom,0px)); display:flex; gap:14px; z-index:7; pointer-events:none; }
+  .ctrl-btn { width:64px; height:64px; border-radius:50%; border:none; background:rgba(255,255,255,.78); box-shadow:0 3px 14px rgba(0,0,0,.2);
+    font-size:24px; color:#455a75; cursor:pointer; pointer-events:auto; touch-action:none; user-select:none; -webkit-user-select:none;
+    backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); }
+  .ctrl-btn:active { transform:scale(.9); background:rgba(224,104,138,.9); color:#fff; }
+  #btnFire { position:fixed; right:16px; bottom:calc(24px + env(safe-area-inset-bottom,0px)); z-index:7;
+    width:74px; height:74px; font-size:32px; border-radius:50%; background:rgba(255,107,61,.92); color:#fff;
+    box-shadow:0 4px 18px rgba(224,60,40,.35); }
+  #btnFire:active { background:rgba(224,60,40,.95); transform:scale(.9); }
+  @media (max-width:600px){
+    .ctrl-btn { width:74px; height:74px; font-size:28px; }
+    #btnFire { width:84px; height:84px; font-size:38px; }
+  }
   #title { position:fixed; top:12px; right:14px; text-align:right; pointer-events:none; z-index:5; color:#8a97ad; }
   #title b { font-size:17px; color:#e0688a; letter-spacing:2px; }
   #title span { font-size:11px; display:block; opacity:.7; }
-  #soundBtn { position:fixed; bottom:14px; right:14px; z-index:6; width:46px; height:46px; border-radius:50%;
+  #soundBtn { position:fixed; top:66px; right:14px; z-index:6; width:46px; height:46px; border-radius:50%;
     border:none; background:rgba(255,255,255,.85); box-shadow:0 2px 10px rgba(0,0,0,.12); font-size:20px; cursor:pointer; color:#555; }
+  #livesEl { font-size:17px; letter-spacing:2px; margin-top:3px; text-shadow:0 1px 3px rgba(255,255,255,.7); }
+  #score, #comboEl, #timerEl, #title b, .panel h2, .start-panel h1, .btn, .meme-hint, .lb-score, #livesEl {
+    font-family:"ZCOOL KuaiLe","Microsoft YaHei","PingFang SC",sans-serif; }
   #overlay { position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center;
     background:rgba(20,30,45,.55); z-index:10; backdrop-filter:blur(3px); }
   #overlay.show { display:flex; }
@@ -96,6 +108,7 @@
   <div id="score">0</div>
   <div id="jumps">0 跳</div>
   <div id="best"></div>
+  <div id="livesEl">❤️❤️❤️</div>
   <div id="coinEl">💰 0</div>
   <div id="comboEl"></div>
   <div id="modeTag"></div>
@@ -105,11 +118,11 @@
 <div id="title"><b>鸡你太美·跳一跳</b><span>玩法大礼包 v2.0 · ikun 版</span></div>
 <div class="hint">👆 点击屏幕开始</div>
 <button id="soundBtn">🔊</button>
-<div id="ctrlBar">
+<div id="moveBar">
   <button class="ctrl-btn" id="btnLeft">◀</button>
   <button class="ctrl-btn" id="btnRight">▶</button>
-  <button class="ctrl-btn" id="btnFire">🏀</button>
 </div>
+<button class="ctrl-btn" id="btnFire">🏀</button>
 
 <div id="overlay">
   <div class="panel">
@@ -203,6 +216,7 @@ const toast = document.getElementById('toast');
 const hintEl = document.querySelector('.hint');
 const redMoonTag = document.getElementById('redMoonTag');
 const startCoinsEl = document.getElementById('startCoins');
+const livesEl = document.getElementById('livesEl');
 const sJump = document.getElementById('sJump');
 const sFail = document.getElementById('sFail');
 const sBgm = document.getElementById('sBgm');
@@ -251,6 +265,7 @@ let moveLeft = false, moveRight = false, firePressed = false, fireCd = 0;
 let playerBullets = [], lionBullets = [];
 let lion = null, lionPending = 0, nextLionScore = 100, nextBigLionScore = 1000;
 let vehicle = null, nextVehScore = 600;
+let lives = 3, invincible = 0;
 
 const player = { x:0, y:0, vx:0, vy:0, rot:0, sx:1, sy:1, targetBox:null, landed:false, standingBox:null, springLaunch:false };
 
@@ -387,6 +402,8 @@ function newGame(){
   lion = null; lionPending = 0;
   nextLionScore = 100; nextBigLionScore = 1000;
   vehicle = null; nextVehScore = 600;
+  lives = 3; invincible = 0;
+  updateLivesHud();
   redMoonTag.style.display = 'none';
   if(mode === 'daily') rng = mulberry32(hashStr('cxk-jump-' + dateStr()));
   else rng = Math.random;
@@ -779,7 +796,7 @@ function landOn(box, scored){
     popup('误食葵菜！', '#7ec850', true);
     burst(player.x - camX, topY - 20, '#7ec850', 20);
     burst(player.x - camX, topY - 20, '#ffd23e', 10);
-    die('plant');
+    hurt('plant');
     return;
   }
   player.y = topY;
@@ -814,7 +831,7 @@ function landOn(box, scored){
     }
     updateComboHud();
 
-    checkMilestones();
+    checkMilestones(true);
 
     if(box.type === 'coin'){
       addCoin(2);
@@ -863,6 +880,48 @@ function die(reason){
   player.vx = 0;
   if(reason) diedBy = reason;
   playFail();
+}
+
+/* ---------------- 三条命系统 ---------------- */
+function playHurt(){ tone(220, 0.18, 'sawtooth', 0.12); tone(150, 0.28, 'sawtooth', 0.12, 0.1); }
+function updateLivesHud(){
+  livesEl.textContent = '❤️'.repeat(Math.max(0, lives)) + '🖤'.repeat(Math.max(0, 3 - lives));
+}
+// 复位到安全台子（无敌期间的位置性伤害也调用；不掉命）
+function revivePos(){
+  let b = boxes[0];
+  if(!b || b.dead || b.type === 'cracked' || (lion && !lion.dead && lion.box === b)) b = boxes[1];
+  if(!b || b.dead || b.type === 'cracked' || (lion && !lion.dead && lion.box === b)) b = boxes[2] || boxes[0];
+  if(!b) b = boxes[0];
+  while(boxes.length > 1 && boxes[0] !== b) boxes.shift();
+  player.targetBox = boxes[1] || null;
+  while(boxes.length < 5) spawnNext();
+  if(!player.targetBox) player.targetBox = boxes[1];
+  // 狮子被甩在身后（台子已被挤掉）→ 狮子消失
+  if(lion && !boxes.includes(lion.box)) lion = null;
+  player.x = b.x + b.w/2;
+  player.y = topY;
+  player.vx = 0; player.vy = 0; player.rot = 0;
+  player.sx = 1; player.sy = 1;
+  player.landed = false;
+  player.standingBox = b;
+  player.springLaunch = false;
+  state = STATE.IDLE;
+}
+function hurt(reason){
+  if(invincible > 0) return; // 弹道类伤害无敌期间完全免疫
+  lives--;
+  updateLivesHud();
+  if(lives <= 0){ die(reason); return; }
+  // 复活：清近身威胁 + 短暂无敌 + 回到安全台子
+  invincible = 2.5;
+  lionBullets.length = 0; letters.length = 0; fans.length = 0;
+  if(vehicle) vehicle = null;
+  combo = 0; mult = 1; updateComboHud();
+  revivePos();
+  popup('还剩 ' + lives + ' 条命 💔', '#ff6b6b', true, W/2, H*0.3);
+  burst(player.x - camX, topY - 30, '#ff6b6b', 22);
+  playHurt();
 }
 
 /* ---------------- 红月隐藏玩法 ---------------- */
@@ -933,11 +992,7 @@ function killLion(){
   addCoin(big ? 15 : 3);
   playSpring();
   lion.dead = true; lion.deadT = 0;
-  checkMilestones();
-  if(lionPending){
-    spawnLion(lionPending === 2);
-    lionPending = 0;
-  }
+  checkMilestones(false);
 }
 
 function spawnVehicle(){
@@ -953,14 +1008,15 @@ function spawnVehicle(){
   playVehicle();
 }
 
-function checkMilestones(){
+function checkMilestones(landing){
+  // 狮子只在落地时生成（击杀加分不能触发无限刷狮循环）
   while(nextLionScore <= score){
-    if(!lion) spawnLion(false); else lionPending = Math.max(lionPending, 1);
     nextLionScore += 100;
+    if(landing && !lion) spawnLion(false);
   }
   while(nextBigLionScore <= score){
-    if(!lion) spawnLion(true); else lionPending = 2;
     nextBigLionScore += 1000;
+    if(landing && !lion) spawnLion(true);
   }
   while(nextVehScore <= score){
     nextVehScore += 600;
@@ -988,7 +1044,7 @@ function update(dt){
         b.dead = true; b.fallT = 0;
         if(player.standingBox === b && (state === STATE.IDLE || state === STATE.CHARGE)){
           popup('踩碎了！', '#c98a4a', true);
-          die('crack');
+          hurt('crack');
         }
       }
     }
@@ -1006,7 +1062,7 @@ function update(dt){
       player.x += sb.x - sb.prevX;
       if(player.x < sb.x - LAND_PAD || player.x > sb.x + sb.w + LAND_PAD){
         popup('被甩下去了！', '#8a97ad', true);
-        die('slide');
+        if(invincible > 0) revivePos(); else hurt('slide');
       }
     }
   }
@@ -1066,9 +1122,9 @@ function update(dt){
       } else if(onTgt && lionOnTgt){
         popup('被狮子扑倒了！', '#ffa040', true);
         burst(player.x - camX, player.y - 20, '#ffb400', 20);
-        die('lion');
+        hurt('lion');
       } else if(player.y > topY + 70){
-        die('fall');
+        if(invincible > 0) revivePos(); else hurt('fall');
       }
     }
   }
@@ -1084,6 +1140,7 @@ function update(dt){
   }
   for(let i = fans.length - 1; i >= 0; i--){
     const f = fans[i];
+    if(!f) continue;
     f.t += dt;
     if(f.t >= f.launchT){
       letters.push({ x: f.x, y: f.y, vy: 80, rot: Math.random()*0.7 - 0.35, spin: Math.random()*4.4 - 2.2 });
@@ -1093,18 +1150,19 @@ function update(dt){
   }
   for(let i = letters.length - 1; i >= 0; i--){
     const l = letters[i];
+    if(!l) continue;
     l.vy += 520 * dt;
     l.y += l.vy * dt;
     l.rot += l.spin * dt;
     if(l.y > topY + 90){ letters.splice(i, 1); continue; }
-    if(state !== STATE.DEAD && state !== STATE.READY){
+    if(state !== STATE.DEAD && state !== STATE.READY && invincible <= 0){
       const dx = Math.abs(l.x - player.x);
       const dy = Math.abs(l.y - (player.y - 18));
       if(dx < 24 && dy < 38){
         burst(l.x - camX, l.y - 10, '#e02020', 26);
         burst(l.x - camX, l.y - 10, '#fff', 10);
         letters.splice(i, 1);
-        die('lawyer');
+        hurt('lawyer');
         continue;
       }
     }
@@ -1116,6 +1174,7 @@ function update(dt){
   if(firePressed) fire();
   for(let i = playerBullets.length - 1; i >= 0; i--){
     const b = playerBullets[i];
+    if(!b) continue;
     b.x += b.vx * dt;
     b.rot += 10 * dt;
     let hit = false;
@@ -1135,10 +1194,15 @@ function update(dt){
     lion.t += dt;
     if(lion.t >= lion.shootIn){
       lion.t = 0;
-      lion.shootIn = lion.big ? 1.2 + Math.random() * 0.4 : 2.0 + Math.random() * 0.8;
-      lionBullets.push({ x: lion.x - 20, y: topY - 26 + (Math.random()*8 - 4), vx: lion.big ? -370 : -260, rot: 0 });
-      if(lion.big && Math.random() < 0.3) lionBullets.push({ x: lion.x - 20, y: topY - 38, vx: -340, rot: 0 });
-      tone(300, 0.08, 'square', 0.06);
+      if(Math.abs(lion.x - player.x) < 60){
+        // 贴脸不射击（避免子弹生成在玩家身上秒杀），改为更频繁的短间隔
+        lion.shootIn = 0.4;
+      } else {
+        lion.shootIn = lion.big ? 1.2 + Math.random() * 0.4 : 2.0 + Math.random() * 0.8;
+        lionBullets.push({ x: lion.x - 20, y: topY - 26 + (Math.random()*8 - 4), vx: lion.big ? -370 : -260, rot: 0 });
+        if(lion.big && Math.random() < 0.3) lionBullets.push({ x: lion.x - 20, y: topY - 38, vx: -340, rot: 0 });
+        tone(300, 0.08, 'square', 0.06);
+      }
     }
   } else if(lion && lion.dead){
     lion.deadT += dt;
@@ -1148,14 +1212,15 @@ function update(dt){
   // 狮子篮球子弹（朝玩家飞来）
   for(let i = lionBullets.length - 1; i >= 0; i--){
     const b = lionBullets[i];
+    if(!b) continue;
     b.x += b.vx * dt;
     b.rot += 8 * dt;
     if(b.x < camX - 60){ lionBullets.splice(i, 1); continue; }
-    if(state !== STATE.DEAD && state !== STATE.READY){
+    if(state !== STATE.DEAD && state !== STATE.READY && invincible <= 0){
       if(Math.abs(b.x - player.x) < 20 && Math.abs(b.y - (player.y - 20)) < 30){
         burst(b.x - camX, b.y, '#ff6b3c', 16);
         lionBullets.splice(i, 1);
-        die('lion');
+        hurt('lion');
         continue;
       }
     }
@@ -1169,11 +1234,11 @@ function update(dt){
       vehicle.x += vehicle.dir * vehicle.speed * dt;
       if(vehicle.x < -160 || vehicle.x > W + 160) vehicle = null;
     }
-    if(vehicle && state !== STATE.DEAD && state !== STATE.READY && vehicle.warnT <= 0){
+    if(vehicle && state !== STATE.DEAD && state !== STATE.READY && vehicle.warnT <= 0 && invincible <= 0){
       if(Math.abs(vehicle.x - (player.x - camX)) < 36 && Math.abs(vehicle.y - (player.y - 20)) < 46){
         burst(player.x - camX, player.y - 24, '#ff6060', 24);
         popup(vehicle.skin === 'car' ? '汽车撞来了！' : '快艇撞来了！', '#ff6060', true);
-        die(vehicle.skin === 'car' ? 'car' : 'boat');
+        hurt(vehicle.skin === 'car' ? 'car' : 'boat');
       }
     }
   }
@@ -1639,6 +1704,11 @@ function drawPlayer(){
   ctx.fill();
   ctx.restore();
 
+  // 复活无敌闪烁
+  if(invincible > 0 && state !== STATE.DEAD){
+    ctx.globalAlpha = 0.35 + 0.3 * Math.sin(gameT * 22);
+  }
+
   if(skin === 'ball'){
     drawBasketball();
   } else if(skin === 'gold'){
@@ -1779,15 +1849,23 @@ function drawAimGuide(){
 function drawPopups(){
   for(const p of popups){
     const a = Math.max(0, 1 - p.t/1.1);
+    // 弹入动画：0.12s 放大到 1.15 再回落
+    let sc = 1;
+    if(p.t < 0.12) sc = 0.3 + (p.t / 0.12) * 0.85;
+    else if(p.t < 0.24) sc = 1.15 - ((p.t - 0.12) / 0.12) * 0.15;
     ctx.save();
     ctx.globalAlpha = a;
     ctx.translate(p.x, p.y);
     ctx.rotate((p.t * 0.4) - 0.15);
-    ctx.font = (p.big ? 'bold 34px' : 'bold 18px') + ' "Microsoft YaHei","PingFang SC",sans-serif';
+    ctx.scale(sc, sc);
+    ctx.font = (p.big ? 'bold 38px' : 'bold 20px') + ' "ZCOOL KuaiLe","Microsoft YaHei","PingFang SC",sans-serif';
     ctx.textAlign = 'center';
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = 'rgba(255,255,255,.9)';
+    ctx.lineWidth = p.big ? 6 : 4;
+    ctx.strokeStyle = 'rgba(255,255,255,.92)';
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = p.big ? 18 : 10;
     ctx.strokeText(p.text, 0, 0);
+    ctx.shadowBlur = 0;
     ctx.fillStyle = p.color;
     ctx.fillText(p.text, 0, 0);
     ctx.restore();
@@ -2075,6 +2153,11 @@ function loop(ts){
 
 const spriteImg = new Image();
 spriteImg.src = 'cxk.png';
+
+// 预加载站酷快乐体（canvas 文字特效用）
+if(document.fonts && document.fonts.load){
+  try{ document.fonts.load('20px "ZCOOL KuaiLe"'); }catch(e){}
+}
 
 resize();
 newGame();
