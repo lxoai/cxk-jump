@@ -928,8 +928,8 @@ function killLion(){
   const big = lion.big;
   burst(lion.x - camX, topY - 30, '#ffb400', 30);
   burst(lion.x - camX, topY - 30, '#ff6b3c', 20);
-  popup(big ? '精英狮子击退！+200' : '狮子座击退！+20', '#ffb400', big);
-  addScore(pts(big ? 200 : 20));
+  popup(big ? '精英狮子击退！+200' : '狮子座击退！+50', '#ffb400', big);
+  addScore(pts(big ? 200 : 50));
   addCoin(big ? 15 : 3);
   playSpring();
   lion.dead = true; lion.deadT = 0;
