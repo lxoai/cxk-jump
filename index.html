@@ -209,7 +209,7 @@
 <div id="rechargeOverlay">
   <div class="panel">
     <h2>💰 金币充值</h2>
-    <div class="sub" id="rechargeNote">选择套餐，扫码付款后自动/自助到账</div>
+    <div class="sub" id="rechargeNote">¥1 起充，扫码付款后到账</div>
     <div id="rechargeList"></div>
     <div style="font-size:11px;color:#aaa;margin-top:10px;">支付方式：个人微信收款码（手动确认）</div>
     <button class="btn" id="rechargeClose">关闭</button>
@@ -369,6 +369,7 @@ const TITLES = [
 ];
 const TITLE_BADGES = { t1:'🎓', t2:'🖤', t3:'🐔', t4:'🦁' };
 const RECHARGE_PKGS = [
+  { id:'p0', rmb:1,   coins:100,  first:false },
   { id:'p1', rmb:6,   coins:600,  first:true },
   { id:'p2', rmb:12,  coins:1300, first:false },
   { id:'p3', rmb:30,  coins:3500, first:false },
