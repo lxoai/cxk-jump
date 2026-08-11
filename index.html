@@ -40,6 +40,7 @@
   .panel { background:#fff; border-radius:18px; padding:24px 30px; text-align:center; box-shadow:0 12px 40px rgba(0,0,0,.25); max-height:94vh; overflow-y:auto; }
   .panel h2 { font-size:26px; color:#e0688a; margin-bottom:6px; letter-spacing:4px; }
   .panel .sub { font-size:13px; color:#999; margin-bottom:12px; }
+  .meme-hint { font-size:13px; color:#b08a5a; margin:0 0 10px; font-style:italic; }
   .panel .fs { font-size:40px; font-weight:800; color:#455a75; }
   .panel .fs small { font-size:14px; color:#aaa; font-weight:400; }
   .stats-row { font-size:13px; color:#888; margin-top:6px; }
@@ -114,6 +115,7 @@
   <div class="panel">
     <h2 id="overlayTitle">跳空了！</h2>
     <div class="sub" id="overlaySub">你干嘛～ 哈哈哎哟</div>
+    <div class="meme-hint" id="overlayHint"></div>
     <div class="fs"><span id="finScore">0</span> <small>分</small></div>
     <div class="stats-row">共 <span id="finJumps">0</span> 跳 · PERFECT <span id="finPerfects">0</span> · 最高连击 <span id="finCombo">0</span> · 💰 <span id="finCoins">+0</span></div>
     <div style="margin-top:4px;font-size:13px;color:#aaa;">历史最高 <span id="finBest">0</span> 分</div>
@@ -188,6 +190,7 @@ const overlay = document.getElementById('overlay');
 const startOverlay = document.getElementById('startOverlay');
 const overlayTitle = document.getElementById('overlayTitle');
 const overlaySub = document.getElementById('overlaySub');
+const overlayHint = document.getElementById('overlayHint');
 const finScore = document.getElementById('finScore');
 const finJumps = document.getElementById('finJumps');
 const finBest = document.getElementById('finBest');
@@ -247,7 +250,7 @@ let redMoon = false, fans = [], letters = [], fanT = 0, nextFanIn = 0, flashT = 
 let moveLeft = false, moveRight = false, firePressed = false, fireCd = 0;
 let playerBullets = [], lionBullets = [];
 let lion = null, lionPending = 0, nextLionScore = 100, nextBigLionScore = 1000;
-let vehicle = null, nextVehScore = 500;
+let vehicle = null, nextVehScore = 600;
 
 const player = { x:0, y:0, vx:0, vy:0, rot:0, sx:1, sy:1, targetBox:null, landed:false, standingBox:null, springLaunch:false };
 
@@ -260,6 +263,23 @@ const COLORS = [
 
 const MEMES = ['鸡你太美','你干嘛～','小黑子','唱跳Rap篮球','坤坤加油','铁山靠','只因你太美','篮球梦'];
 const MILESTONE = ['鸡你太美！','太美了！','坤坤附体','封神了','无敌了'];
+const DIE_HINTS = [
+  '食不食油饼？（是不是有病）',
+  '小黑子露出鸡脚了吧',
+  '盐以律己，甜以待人',
+  '只因你太美，可惜太短命',
+  '鸡你太美，命数已尽',
+  '唱、跳、Rap、篮球，样样不行',
+  '中分头的诅咒',
+  '铁山靠，靠不住',
+  '背带裤绊脚了',
+  '你是我的神，但神也会死',
+  '篮球梦，碎了',
+  'ikun 不哭，站起来哭',
+  '鸡你太美，再来亿遍',
+  '油饼吃饱了，上路吧',
+  '黑子别跑，撞到鸡脚了'
+];
 const DIE_TITLES = { fall:'跳空了！', crack:'踩碎了！', slide:'被甩下去了！', time:'时间到！', lawyer:'被律师函击中了！', lion:'被狮子扑倒了！', plant:'吃了葵菜！', car:'被汽车撞飞了！', boat:'被快艇撞飞了！' };
 const DIE_SUBS = { fall:'你干嘛～ 哈哈哎哟', crack:'碎台子不是好惹的…', slide:'移动台子会甩人！', time:'60 秒结束，跳得不错嘛', lawyer:'真爱粉的怒火，收下吧！', lion:'狮子座的力量，你干嘛～', plant:'那是坤坤的菜你也敢吃…', car:'汽运（气运）到头了…', boat:'开艇（开庭）了，律师函都不够用' };
 
@@ -366,7 +386,7 @@ function newGame(){
   moveLeft = false; moveRight = false; firePressed = false; fireCd = 0;
   lion = null; lionPending = 0;
   nextLionScore = 100; nextBigLionScore = 1000;
-  vehicle = null; nextVehScore = 500;
+  vehicle = null; nextVehScore = 600;
   redMoonTag.style.display = 'none';
   if(mode === 'daily') rng = mulberry32(hashStr('cxk-jump-' + dateStr()));
   else rng = Math.random;
@@ -714,6 +734,7 @@ function addScore(pts){
   if(score > best){ best = score; localStorage.setItem('cxk_jump_best', best); bestEl.textContent = '最高 ' + best; }
   return pts;
 }
+function pts(n){ return redMoon ? n * 2 : n; } // 红月模式下所有得分双倍
 function addCoin(n){
   coins += n;
   localStorage.setItem('cxk_coins', coins);
@@ -781,15 +802,15 @@ function landOn(box, scored){
       combo++; maxCombo = Math.max(maxCombo, combo);
       mult = Math.min(5, 1 + 0.5 * (combo - 1));
       perfects++;
-      addScore(Math.round(25 * mult));
+      addScore(pts(Math.round(25 * mult)));
       addCoin(1);
-      popup('PERFECT +' + Math.round(25 * mult), '#ffd700', true);
+      popup('PERFECT +' + pts(Math.round(25 * mult)), '#ffd700', true);
       burst(player.x - camX, topY - 26, '#ffd700', 18);
       playPerfect();
     } else {
       combo = 0; mult = 1;
-      addScore(Math.round(base * mult));
-      popup('+' + Math.round(base * mult), '#5fa8e0', false);
+      addScore(pts(Math.round(base * mult)));
+      popup('+' + pts(Math.round(base * mult)), '#5fa8e0', false);
     }
     updateComboHud();
 
@@ -850,6 +871,7 @@ function enterRedMoon(){
   redMoonTag.style.display = 'block';
   popup('🌕 红月降临', '#ff5050', true, W/2, H*0.24);
   popup('坤坤怒了！', '#ff2020', true, W/2, H*0.36);
+  popup('得分双倍！', '#ffd700', true, W/2, H*0.48);
   flashT = 0.7;
   playRedMoon();
   fanT = 0; nextFanIn = 2.2;
@@ -873,7 +895,7 @@ function spawnFan(){
 /* ---------------- 对战系统：投篮 & 狮子座 ---------------- */
 function fire(){
   if(fireCd > 0 || state === STATE.READY || state === STATE.DEAD) return;
-  fireCd = 0.32;
+  fireCd = 0.3;
   playerBullets.push({ x: player.x, y: player.y - 24, vx: 520, rot: 0 });
   tone(520, 0.07, 'square', 0.07);
 }
@@ -890,10 +912,10 @@ function spawnLion(big){
     box: tgt,
     x: tgt.x + tgt.w/2,
     y: topY,
-    hp: big ? 8 : 2,
-    maxHp: big ? 8 : 2,
+    hp: big ? 6 : 2,
+    maxHp: big ? 6 : 2,
     t: 0,
-    shootIn: big ? 0.8 : 1.4 + Math.random() * 0.8,
+    shootIn: big ? 1.2 : 2.0 + Math.random() * 0.8,
     dead: false, deadT: 0,
     wob: Math.random() * 6.28
   };
@@ -906,8 +928,8 @@ function killLion(){
   const big = lion.big;
   burst(lion.x - camX, topY - 30, '#ffb400', 30);
   burst(lion.x - camX, topY - 30, '#ff6b3c', 20);
-  popup(big ? '精英狮子击退！+200' : '狮子座击退！+30', '#ffb400', big);
-  addScore(big ? 200 : 30);
+  popup(big ? '精英狮子击退！+200' : '狮子座击退！+20', '#ffb400', big);
+  addScore(pts(big ? 200 : 20));
   addCoin(big ? 15 : 3);
   playSpring();
   lion.dead = true; lion.deadT = 0;
@@ -941,7 +963,7 @@ function checkMilestones(){
     nextBigLionScore += 1000;
   }
   while(nextVehScore <= score){
-    nextVehScore += 500;
+    nextVehScore += 600;
     if(!vehicle) spawnVehicle();
   }
   if(!redMoon && score >= 1000) enterRedMoon();
@@ -1113,9 +1135,9 @@ function update(dt){
     lion.t += dt;
     if(lion.t >= lion.shootIn){
       lion.t = 0;
-      lion.shootIn = lion.big ? 0.9 + Math.random() * 0.4 : 1.6 + Math.random() * 0.8;
-      lionBullets.push({ x: lion.x - 20, y: topY - 26 + (Math.random()*8 - 4), vx: lion.big ? -430 : -320, rot: 0 });
-      if(lion.big && Math.random() < 0.45) lionBullets.push({ x: lion.x - 20, y: topY - 38, vx: -400, rot: 0 });
+      lion.shootIn = lion.big ? 1.2 + Math.random() * 0.4 : 2.0 + Math.random() * 0.8;
+      lionBullets.push({ x: lion.x - 20, y: topY - 26 + (Math.random()*8 - 4), vx: lion.big ? -370 : -260, rot: 0 });
+      if(lion.big && Math.random() < 0.3) lionBullets.push({ x: lion.x - 20, y: topY - 38, vx: -340, rot: 0 });
       tone(300, 0.08, 'square', 0.06);
     }
   } else if(lion && lion.dead){
@@ -1182,6 +1204,7 @@ function update(dt){
       finCoins.textContent = '+' + (coins - coinsAtStart);
       overlayTitle.textContent = DIE_TITLES[diedBy] || '跳空了！';
       overlaySub.textContent = DIE_SUBS[diedBy] || DIE_SUBS.fall;
+      overlayHint.textContent = DIE_HINTS[(Math.random() * DIE_HINTS.length) | 0];
       overlay.classList.add('show');
       showSubmitRow();
       cardDataUrl = makeCardDataUrl();
